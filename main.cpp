@@ -7,6 +7,7 @@
 #include "Journal.h"
 #include "LibraryDatabase.h"
 #include "Magazine.h"
+#include "ReservationQueue.h"
 #include "UserAccount.h"
 
 // This function accepts the common base type. The correct itemType()
@@ -46,4 +47,13 @@ int main() {
     if (record.getReturnedOn().has_value()) {
         std::cout << "Returned on: " << record.getReturnedOn().value() << "\n";
     }
+
+    ReservationQueue reservations;
+    reservations.addReservation("U002"); // Sam reserves first.
+    reservations.addReservation("U003"); // Alex reserves second.
+    const auto nextUserId = reservations.takeNextUser();
+    if (nextUserId.has_value()) {
+        std::cout << "Next user waiting: " << nextUserId.value() << "\n";
+    }
+    std::cout << "Users still waiting: " << reservations.getWaitingCount() << "\n";
 }
