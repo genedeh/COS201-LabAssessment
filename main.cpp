@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <memory>
 
+#include "AdminActionHistory.h"
 #include "Book.h"
 #include "BorrowingRecord.h"
 #include "Journal.h"
@@ -56,4 +57,19 @@ int main() {
         std::cout << "Next user waiting: " << nextUserId.value() << "\n";
     }
     std::cout << "Users still waiting: " << reservations.getWaitingCount() << "\n";
+
+    AdminActionHistory adminHistory;
+    adminHistory.recordAction({
+        AdminAction::Kind::ItemAdded,
+        "B002", "Book", "Dune", 1965, "Frank Herbert"});
+    adminHistory.recordAction({
+        AdminAction::Kind::ItemDeleted,
+        "M002", "Magazine", "Nature Weekly", 2024, ""});
+
+    const auto actionToUndo = adminHistory.takeMostRecentAction();
+    if (actionToUndo.has_value()) {
+        std::cout << "Most recent action to undo: "
+                  << actionToUndo->itemType << " "
+                  << actionToUndo->title << "\n";
+    }
 }
