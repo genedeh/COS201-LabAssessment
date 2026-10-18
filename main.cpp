@@ -3,9 +3,11 @@
 #include <memory>
 
 #include "Book.h"
+#include "BorrowingRecord.h"
 #include "Journal.h"
 #include "LibraryDatabase.h"
 #include "Magazine.h"
+#include "UserAccount.h"
 
 // This function accepts the common base type. The correct itemType()
 // implementation is chosen at runtime for each child object (polymorphism).
@@ -33,4 +35,15 @@ int main() {
     }
 
     std::cout << "Total items: " << database.getItemCount() << "\n";
+
+    UserAccount user("U001", "Ada");
+    user.addBorrowingRecord(BorrowingRecord("B001", "2026-10-01"));
+    user.markItemReturned("B001", "2026-10-18");
+
+    const BorrowingRecord& record = user.getBorrowingHistory().front();
+    std::cout << user.getName() << " borrowed item " << record.getItemId()
+              << " on " << record.getBorrowedOn() << "\n";
+    if (record.getReturnedOn().has_value()) {
+        std::cout << "Returned on: " << record.getReturnedOn().value() << "\n";
+    }
 }
