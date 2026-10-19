@@ -7,6 +7,7 @@
 #include "BorrowingRecord.h"
 #include "Journal.h"
 #include "LibraryDatabase.h"
+#include "ItemAccessCache.h"
 #include "Magazine.h"
 #include "ReservationQueue.h"
 #include "UserAccount.h"
@@ -72,4 +73,16 @@ int main() {
                   << actionToUndo->itemType << " "
                   << actionToUndo->title << "\n";
     }
+
+    ItemAccessCache<3> accessCache;
+    accessCache.recordAccess("B001");
+    accessCache.recordAccess("M001");
+    accessCache.recordAccess("J001");
+    accessCache.recordAccess("B001"); // Cache is full, so the oldest ID is replaced.
+
+    std::cout << "Cached item IDs, oldest to newest: ";
+    for (std::size_t index = 0; index < accessCache.getItemCount(); ++index) {
+        std::cout << accessCache.getItemIdAt(index) << " ";
+    }
+    std::cout << "\n";
 }
