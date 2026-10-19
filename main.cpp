@@ -5,9 +5,9 @@
 #include "AdminActionHistory.h"
 #include "Book.h"
 #include "BorrowingRecord.h"
+#include "controller/SearchEngine.h"
 #include "Journal.h"
 #include "LibraryDatabase.h"
-#include "ItemAccessCache.h"
 #include "Magazine.h"
 #include "ReservationQueue.h"
 #include "UserAccount.h"
@@ -74,15 +74,21 @@ int main() {
                   << actionToUndo->title << "\n";
     }
 
-    ItemAccessCache<3> accessCache;
-    accessCache.recordAccess("B001");
-    accessCache.recordAccess("M001");
-    accessCache.recordAccess("J001");
-    accessCache.recordAccess("B001"); // Cache is full, so the oldest ID is replaced.
+    SearchEngine searchEngine;
+    searchEngine.searchByTitle(database, "things fall apart");
+    searchEngine.searchByTitle(database, "science monthly");
+    searchEngine.searchByTitle(database, "journal of computing");
+    const LibraryItem* found =
+        searchEngine.searchByTitle(database, "things fall apart");
 
-    std::cout << "Cached item IDs, oldest to newest: ";
-    for (std::size_t index = 0; index < accessCache.getItemCount(); ++index) {
-        std::cout << accessCache.getItemIdAt(index) << " ";
+    if (found != nullptr) {
+        std::cout << "Search found: ";
+        printItem(*found);
+    }
+
+    std::cout << "Recently accessed item IDs, oldest to newest: ";
+    for (std::size_t index = 0; index < searchEngine.getCachedItemCount(); ++index) {
+        std::cout << searchEngine.getCachedItemIdAt(index) << " ";
     }
     std::cout << "\n";
 }
