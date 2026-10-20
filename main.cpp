@@ -96,6 +96,15 @@ int main() {
         }
     }
 
+    const std::vector<const LibraryItem*> achebeBooks =
+        searchEngine.searchByAuthor(database, "CHINUA ACHEBE");
+    std::cout << "Books found by author: " << achebeBooks.size() << "\n";
+    for (const LibraryItem* item : achebeBooks) {
+        if (item != nullptr) {
+            printItem(*item);
+        }
+    }
+
     // Simulate the user opening the book three times, and each other item once.
     if (found != nullptr) {
         searchEngine.recordItemAccess(*found);

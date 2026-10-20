@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "../Book.h"
 #include "../ItemAccessCache.h"
 #include "../LibraryDatabase.h"
 
@@ -51,6 +52,25 @@ public:
             const LibraryItem* item = database.getItemAt(index);
             if (item != nullptr && toLowercase(item->itemType()) == targetType) {
                 matches.push_back(item);
+            }
+        }
+
+        return matches;
+    }
+
+    // Only Books have authors. Other item types are skipped safely.
+    std::vector<const LibraryItem*> searchByAuthor(const LibraryDatabase& database,
+                                                    const std::string& author) {
+        const std::string targetAuthor = toLowercase(author);
+        std::vector<const LibraryItem*> matches;
+
+        for (std::size_t index = 0; index < database.getItemCount(); ++index) {
+            const LibraryItem* item = database.getItemAt(index);
+            const Book* book = dynamic_cast<const Book*>(item);
+
+            if (book != nullptr &&
+                toLowercase(book->getAuthor()) == targetAuthor) {
+                matches.push_back(book);
             }
         }
 
