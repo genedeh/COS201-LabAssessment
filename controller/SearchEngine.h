@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,6 @@ public:
         for (std::size_t index = 0; index < database.getItemCount(); ++index) {
             const LibraryItem* item = database.getItemAt(index);
             if (item != nullptr && toLowercase(item->getTitle()) == targetTitle) {
-                accessCache.recordAccess(item->getId());
                 return item;
             }
         }
@@ -50,7 +50,6 @@ public:
         for (std::size_t index = 0; index < database.getItemCount(); ++index) {
             const LibraryItem* item = database.getItemAt(index);
             if (item != nullptr && toLowercase(item->itemType()) == targetType) {
-                accessCache.recordAccess(item->getId());
                 matches.push_back(item);
             }
         }
@@ -58,12 +57,18 @@ public:
         return matches;
     }
 
+    // Call this when a user opens or selects one specific item.
+    void recordItemAccess(const LibraryItem& item) {
+        accessCache.recordAccess(item.getId());
+    }
+
     std::size_t getCachedItemCount() const {
         return accessCache.getItemCount();
     }
 
-    std::string getCachedItemIdAt(std::size_t position) const {
-        return accessCache.getItemIdAt(position);
+    std::optional<ItemAccessCache<3>::CacheEntry> getMostFrequentlyAccessedAt(
+        std::size_t rank) const {
+        return accessCache.getMostFrequentAt(rank);
     }
 };
 

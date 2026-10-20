@@ -96,9 +96,28 @@ int main() {
         }
     }
 
-    std::cout << "Recently accessed item IDs, oldest to newest: ";
+    // Simulate the user opening the book three times, and each other item once.
+    if (found != nullptr) {
+        searchEngine.recordItemAccess(*found);
+        searchEngine.recordItemAccess(*found);
+        searchEngine.recordItemAccess(*found);
+    }
+    const LibraryItem* magazine = database.getItemAt(1);
+    const LibraryItem* journal = database.getItemAt(2);
+    if (magazine != nullptr) {
+        searchEngine.recordItemAccess(*magazine);
+    }
+    if (journal != nullptr) {
+        searchEngine.recordItemAccess(*journal);
+    }
+
+    std::cout << "Most frequently accessed item IDs: ";
     for (std::size_t index = 0; index < searchEngine.getCachedItemCount(); ++index) {
-        std::cout << searchEngine.getCachedItemIdAt(index) << " ";
+        const auto cachedItem = searchEngine.getMostFrequentlyAccessedAt(index);
+        if (cachedItem.has_value()) {
+            std::cout << cachedItem->itemId << " ("
+                      << cachedItem->accessCount << " accesses) ";
+        }
     }
     std::cout << "\n";
 }
