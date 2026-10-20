@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cstddef>
 #include <string>
+#include <vector>
 
 #include "../ItemAccessCache.h"
 #include "../LibraryDatabase.h"
@@ -37,6 +38,24 @@ public:
         }
 
         return nullptr;
+    }
+
+    // Returns every matching item because a library can contain many items
+    // of the same type.
+    std::vector<const LibraryItem*> searchByType(const LibraryDatabase& database,
+                                                  const std::string& type) {
+        const std::string targetType = toLowercase(type);
+        std::vector<const LibraryItem*> matches;
+
+        for (std::size_t index = 0; index < database.getItemCount(); ++index) {
+            const LibraryItem* item = database.getItemAt(index);
+            if (item != nullptr && toLowercase(item->itemType()) == targetType) {
+                accessCache.recordAccess(item->getId());
+                matches.push_back(item);
+            }
+        }
+
+        return matches;
     }
 
     std::size_t getCachedItemCount() const {

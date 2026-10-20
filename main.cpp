@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 #include "AdminActionHistory.h"
 #include "Book.h"
@@ -84,6 +85,15 @@ int main() {
     if (found != nullptr) {
         std::cout << "Search found: ";
         printItem(*found);
+    }
+
+    const std::vector<const LibraryItem*> books =
+        searchEngine.searchByType(database, "BOOK");
+    std::cout << "Books found by type: " << books.size() << "\n";
+    for (const LibraryItem* book : books) {
+        if (book != nullptr) {
+            printItem(*book);
+        }
     }
 
     std::cout << "Recently accessed item IDs, oldest to newest: ";
