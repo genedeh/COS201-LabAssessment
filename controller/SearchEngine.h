@@ -77,6 +77,56 @@ public:
         return matches;
     }
 
+    // Makes a sorted view of item pointers. The database keeps ownership and
+    // its original item order is not changed. We will replace std::sort with
+    // a student-written algorithm in the sorting lesson.
+    std::vector<const LibraryItem*> makeTitleSortedView(
+        const LibraryDatabase& database) const {
+        std::vector<const LibraryItem*> sortedItems;
+        sortedItems.reserve(database.getItemCount());
+
+        for (std::size_t index = 0; index < database.getItemCount(); ++index) {
+            const LibraryItem* item = database.getItemAt(index);
+            if (item != nullptr) {
+                sortedItems.push_back(item);
+            }
+        }
+
+        std::sort(sortedItems.begin(), sortedItems.end(),
+                  [](const LibraryItem* left, const LibraryItem* right) {
+                      return toLowercase(left->getTitle()) <
+                             toLowercase(right->getTitle());
+                  });
+        return sortedItems;
+    }
+
+    // Binary search requires this pointer list to be sorted by title.
+    const LibraryItem* binarySearchByTitle(
+        const std::vector<const LibraryItem*>& sortedItems,
+        const std::string& title) const {
+        const std::string targetTitle = toLowercase(title);
+        std::size_t first = 0;
+        std::size_t last = sortedItems.size(); // One past the final position.
+
+        while (first < last) {
+            const std::size_t middle = first + (last - first) / 2;
+            const std::string middleTitle =
+                toLowercase(sortedItems[middle]->getTitle());
+
+            if (middleTitle == targetTitle) {
+                return sortedItems[middle];
+            }
+
+            if (middleTitle < targetTitle) {
+                first = middle + 1;
+            } else {
+                last = middle;
+            }
+        }
+
+        return nullptr;
+    }
+
     // Call this when a user opens or selects one specific item.
     void recordItemAccess(const LibraryItem& item) {
         accessCache.recordAccess(item.getId());

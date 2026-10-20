@@ -105,6 +105,15 @@ int main() {
         }
     }
 
+    const std::vector<const LibraryItem*> titleSortedItems =
+        searchEngine.makeTitleSortedView(database);
+    const LibraryItem* binaryFound =
+        searchEngine.binarySearchByTitle(titleSortedItems, "SCIENCE MONTHLY");
+    if (binaryFound != nullptr) {
+        std::cout << "Binary search found: ";
+        printItem(*binaryFound);
+    }
+
     // Simulate the user opening the book three times, and each other item once.
     if (found != nullptr) {
         searchEngine.recordItemAccess(*found);
