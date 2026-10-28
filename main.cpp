@@ -114,6 +114,13 @@ int main() {
         printItem(*binaryFound);
     }
 
+    const LibraryItem* recursiveFound =
+        searchEngine.recursiveSearchByTitle(titleSortedItems, "science monthly");
+    if (recursiveFound != nullptr) {
+        std::cout << "Recursive search found: ";
+        printItem(*recursiveFound);
+    }
+
     // Simulate the user opening the book three times, and each other item once.
     if (found != nullptr) {
         searchEngine.recordItemAccess(*found);

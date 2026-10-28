@@ -25,6 +25,33 @@ private:
         return text;
     }
 
+    const LibraryItem* recursiveSearchByTitle(
+        const std::vector<const LibraryItem*>& sortedItems,
+        const std::string& targetTitle,
+        std::size_t first,
+        std::size_t last) const {
+        // Base case: there are no positions left to search.
+        if (first >= last) {
+            return nullptr;
+        }
+
+        const std::size_t middle = first + (last - first) / 2;
+        const std::string middleTitle =
+            toLowercase(sortedItems[middle]->getTitle());
+
+        if (middleTitle == targetTitle) {
+            return sortedItems[middle];
+        }
+
+        if (middleTitle < targetTitle) {
+            return recursiveSearchByTitle(
+                sortedItems, targetTitle, middle + 1, last);
+        }
+
+        return recursiveSearchByTitle(
+            sortedItems, targetTitle, first, middle);
+    }
+
 public:
     // Case-insensitive linear search. Returns nullptr if there is no match.
     const LibraryItem* searchByTitle(const LibraryDatabase& database,
@@ -125,6 +152,14 @@ public:
         }
 
         return nullptr;
+    }
+
+    // Recursive binary search; sortedItems must be ordered by title.
+    const LibraryItem* recursiveSearchByTitle(
+        const std::vector<const LibraryItem*>& sortedItems,
+        const std::string& title) const {
+        return recursiveSearchByTitle(
+            sortedItems, toLowercase(title), 0, sortedItems.size());
     }
 
     // Call this when a user opens or selects one specific item.
