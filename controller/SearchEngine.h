@@ -104,9 +104,8 @@ public:
         return matches;
     }
 
-    // Makes a sorted view of item pointers. The database keeps ownership and
-    // its original item order is not changed. We will replace std::sort with
-    // a student-written algorithm in the sorting lesson.
+    // Makes a sorted view of item pointers with insertion sort. The database
+    // keeps ownership and its original item order is not changed.
     std::vector<const LibraryItem*> makeTitleSortedView(
         const LibraryDatabase& database) const {
         std::vector<const LibraryItem*> sortedItems;
@@ -119,11 +118,22 @@ public:
             }
         }
 
-        std::sort(sortedItems.begin(), sortedItems.end(),
-                  [](const LibraryItem* left, const LibraryItem* right) {
-                      return toLowercase(left->getTitle()) <
-                             toLowercase(right->getTitle());
-                  });
+        // The left side (before index) is sorted. Hold the next item as the
+        // key, shift larger titles right, and place the key into the gap.
+        for (std::size_t index = 1; index < sortedItems.size(); ++index) {
+            const LibraryItem* keyItem = sortedItems[index];
+            const std::string keyTitle = toLowercase(keyItem->getTitle());
+            std::size_t position = index;
+
+            while (position > 0 &&
+                   toLowercase(sortedItems[position - 1]->getTitle()) > keyTitle) {
+                sortedItems[position] = sortedItems[position - 1];
+                --position;
+            }
+
+            sortedItems[position] = keyItem;
+        }
+
         return sortedItems;
     }
 

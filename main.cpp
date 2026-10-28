@@ -107,6 +107,12 @@ int main() {
 
     const std::vector<const LibraryItem*> titleSortedItems =
         searchEngine.makeTitleSortedView(database);
+    std::cout << "Titles sorted with insertion sort: ";
+    for (const LibraryItem* item : titleSortedItems) {
+        std::cout << item->getTitle() << " | ";
+    }
+    std::cout << "\n";
+
     const LibraryItem* binaryFound =
         searchEngine.binarySearchByTitle(titleSortedItems, "SCIENCE MONTHLY");
     if (binaryFound != nullptr) {
