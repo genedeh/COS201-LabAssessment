@@ -81,6 +81,7 @@ private:
     void loadStartupData();
     bool loadData(const QString& path, bool notify);
     bool saveData(const QString& path, bool notify);
+    void persistAfterChange(const QString& successMessage);
     void refreshAll();
     void refreshDashboard();
     void refreshPatients();

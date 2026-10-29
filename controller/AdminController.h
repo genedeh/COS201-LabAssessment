@@ -46,6 +46,10 @@ public:
             if (auto* patient = database.findPatient(action->appointmentBefore->getPatientId()))
                 patient->scheduleAppointment(action->id);
             break;
+        case model::AdminAction::Kind::QueueJoined:
+        case model::AdminAction::Kind::QueueCalledNext:
+            waiting.restore(action->waitingQueueBefore);
+            break;
         }
     }
 };

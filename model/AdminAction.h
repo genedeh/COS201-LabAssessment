@@ -14,7 +14,8 @@ namespace scapms::model {
 
 struct AdminAction {
     enum class Kind { PatientAdded, PatientDeleted, PatientEdited,
-                      AppointmentScheduled, AppointmentCancelled, AppointmentUpdated };
+                      AppointmentScheduled, AppointmentCancelled, AppointmentUpdated,
+                      QueueJoined, QueueCalledNext };
     Kind kind;
     std::string id;
     std::unique_ptr<PatientRecord> patientBefore;

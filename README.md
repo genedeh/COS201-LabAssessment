@@ -48,8 +48,8 @@ View: gui/MainWindow
 
 - `std::vector<std::unique_ptr<PatientRecord>>` stores polymorphic patients.
 - `std::queue<std::string>` provides first-in, first-out consultation calls.
-- `std::stack<AdminAction>` supports undo for patient and appointment changes.
-- `std::array<Entry, 10>` keeps a fixed-size cache of the most frequently opened patient records. Searching a result list does not increase this count; opening a patient record does.
+- `std::stack<AdminAction>` supports undo for patient changes, appointment changes, and queue joins/calls.
+- `std::array<Entry, 10>` holds the ten most frequently opened records, ranked by their complete access totals. A separate count map retains totals for records outside the current top ten so a later access can move them into the ranking. Searching a result list does not increase this count; opening a patient record does.
 - Linear patient ID search checks records one by one.
 - Binary patient ID search uses a manually insertion-sorted view, then narrows the range by comparing the middle ID.
 - Recursive name search checks one patient per recursive call and stops at the vector length.

@@ -73,9 +73,21 @@ public:
     }
 
     void joinQueue(model::ClinicDatabase& database, model::WaitingQueue& queue,
-                   const std::string& patientId) const {
+                   const std::string& patientId) {
         if (!database.findPatient(patientId)) throw utils::ClinicException("Patient not found.");
+        const auto queueBefore = queue.toVector();
         if (!queue.enqueue(patientId)) throw utils::ClinicException("Patient is already in the waiting queue.");
+        history.record(model::AdminAction(model::AdminAction::Kind::QueueJoined,
+                                          patientId, nullptr, std::nullopt, queueBefore));
+    }
+
+    std::string callNext(model::WaitingQueue& queue) {
+        if (queue.empty()) return {};
+        const auto queueBefore = queue.toVector();
+        const std::string patientId = queue.callNext();
+        history.record(model::AdminAction(model::AdminAction::Kind::QueueCalledNext,
+                                          patientId, nullptr, std::nullopt, queueBefore));
+        return patientId;
     }
 };
 
