@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QString>
+#include <array>
 #include <vector>
 #include <exception>
 
@@ -12,7 +13,6 @@ class QComboBox;
 class QDateTimeEdit;
 class QLabel;
 class QLineEdit;
-class QListWidget;
 class QPushButton;
 class QSpinBox;
 class QStackedWidget;
@@ -30,7 +30,7 @@ private:
     QString dataPath;
     QString seedPath;
 
-    QListWidget* navigation = nullptr;
+    std::array<QPushButton*, 6> navigationButtons{};
     QStackedWidget* pages = nullptr;
     QLineEdit* globalSearch = nullptr;
     QLabel* pageTitle = nullptr;
@@ -71,6 +71,7 @@ private:
     int lastReminderMinute = -1;
 
     void buildUi();
+    void setCurrentPage(int pageIndex);
     QWidget* makeDashboardPage();
     QWidget* makePatientsPage();
     QWidget* makeAppointmentsPage();

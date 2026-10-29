@@ -21,22 +21,30 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
-#include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QKeySequence>
+#include <QIcon>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
 #include <QPushButton>
-#include <QShortcut>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QShortcut>
 #include <QStatusBar>
+#include <QStyle>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTimer>
 #include <QToolBar>
 #include <QVBoxLayout>
 #include <QStringList>
+
+#ifdef SCAPMS_HAS_QT_SVG
+#include <QSvgRenderer>
+#endif
 
 #include <algorithm>
 #include <exception>
@@ -75,6 +83,79 @@ void showClinicMessage(QWidget* parent, QMessageBox::Icon icon,
         "border:0;border-radius:5px;padding:7px 18px;}"
         "QMessageBox QPushButton:hover{background:#27488b;}");
     dialog.exec();
+}
+
+QIcon sidebarIcon(int index, const QColor& color) {
+    static const char* const paths[] = {
+        ":/icons/dashboard.svg", ":/icons/patients.svg", ":/icons/appointments.svg",
+        ":/icons/queue.svg", ":/icons/search-sort.svg", ":/icons/reports.svg"
+    };
+    QPixmap pixmap(48, 48);
+    pixmap.fill(Qt::transparent);
+
+#ifdef SCAPMS_HAS_QT_SVG
+    if (index >= 0 && index < 6) {
+        QSvgRenderer renderer(QString::fromLatin1(paths[index]));
+        if (renderer.isValid()) {
+            QPainter svgPainter(&pixmap);
+            renderer.render(&svgPainter);
+            svgPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+            svgPainter.fillRect(pixmap.rect(), color);
+            return QIcon(pixmap);
+        }
+    }
+#else
+    Q_UNUSED(paths);
+#endif
+
+    // Keep the icons crisp on installations that do not include QtSvg.
+    // Their geometry mirrors the small SVG files packaged with the app.
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.scale(2.0, 2.0);
+    painter.setPen(QPen(color, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    switch (index) {
+    case 0: {
+        QPainterPath house;
+        house.moveTo(3, 10.5); house.lineTo(12, 3); house.lineTo(21, 10.5);
+        house.moveTo(5.5, 9.5); house.lineTo(5.5, 21); house.lineTo(18.5, 21);
+        house.lineTo(18.5, 9.5); house.moveTo(9.5, 21); house.lineTo(9.5, 15);
+        house.lineTo(14.5, 15); house.lineTo(14.5, 21);
+        painter.drawPath(house); break;
+    }
+    case 1: {
+        painter.drawEllipse(QRectF(5.9, 4.4, 6.2, 6.2));
+        painter.drawEllipse(QRectF(15.3, 5.2, 5.2, 5.2));
+        QPainterPath people;
+        people.moveTo(2.8, 20); people.cubicTo(2.8, 16, 5.1, 14, 9, 14);
+        people.cubicTo(12.9, 14, 15.2, 16.3, 15.2, 20);
+        people.moveTo(15.4, 14.5); people.cubicTo(18.8, 14.6, 21.2, 16.7, 21.2, 20);
+        painter.drawPath(people); break;
+    }
+    case 2:
+        painter.drawRoundedRect(QRectF(3.5, 5, 17, 16), 2.2, 2.2);
+        painter.drawLine(QPointF(7.5, 3), QPointF(7.5, 7));
+        painter.drawLine(QPointF(16.5, 3), QPointF(16.5, 7));
+        painter.drawLine(QPointF(3.5, 9.5), QPointF(20.5, 9.5));
+        painter.drawLine(QPointF(8, 14), QPointF(11, 14));
+        painter.drawLine(QPointF(9.5, 12.5), QPointF(9.5, 15.5)); break;
+    case 3:
+        for (int y : {6, 12, 18}) {
+            painter.drawEllipse(QRectF(4, y - 1, 2, 2));
+            painter.drawLine(QPointF(9, y), QPointF(20, y));
+        }
+        break;
+    case 4:
+        painter.drawEllipse(QRectF(4, 4, 13, 13));
+        painter.drawLine(QPointF(15, 15), QPointF(21, 21)); break;
+    case 5:
+        painter.drawLine(QPointF(3.5, 20.5), QPointF(21, 20.5));
+        painter.drawRoundedRect(QRectF(5, 12, 3.5, 5), 0.8, 0.8);
+        painter.drawRoundedRect(QRectF(10.5, 8, 3.5, 9), 0.8, 0.8);
+        painter.drawRoundedRect(QRectF(16, 4, 3.5, 13), 0.8, 0.8); break;
+    }
+    return QIcon(pixmap);
 }
 
 QFrame* makeStatCard(const QString& title, QLabel*& value, QWidget* parent) {
@@ -213,17 +294,79 @@ void MainWindow::buildUi() {
     auto* rootLayout = new QHBoxLayout(root);
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->setSpacing(0);
-    navigation = new QListWidget(root);
-    navigation->setObjectName("navigation");
-    navigation->setFixedWidth(205);
-    navigation->addItems({"Dashboard", "Patients", "Appointments", "Waiting Queue", "Search & Sort", "Reports"});
-    navigation->setCurrentRow(0);
-    auto* sideLayout = new QVBoxLayout();
-    auto* brand = new QLabel("  ●  SCAPMS\n  Smart Clinic", root);
-    brand->setObjectName("brandLabel");
-    sideLayout->addWidget(brand);
-    sideLayout->addWidget(navigation, 1);
-    auto* side = new QWidget(root); side->setObjectName("sidebar"); side->setLayout(sideLayout);
+    auto* side = new QWidget(root);
+    side->setObjectName("sidebar");
+    side->setFixedWidth(232);
+    auto* sideLayout = new QVBoxLayout(side);
+    sideLayout->setContentsMargins(14, 18, 14, 16);
+    sideLayout->setSpacing(5);
+
+    auto* brandRow = new QWidget(side);
+    auto* brandLayout = new QHBoxLayout(brandRow);
+    brandLayout->setContentsMargins(2, 0, 2, 0);
+    brandLayout->setSpacing(9);
+    auto* logo = new QLabel(brandRow);
+    logo->setFixedSize(38, 38);
+    const QPixmap logoImage(":/assets/clinic-logo.png");
+    if (!logoImage.isNull())
+        logo->setPixmap(logoImage.scaled(38, 38, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    auto* brandText = new QVBoxLayout();
+    brandText->setContentsMargins(0, 0, 0, 0);
+    brandText->setSpacing(1);
+    auto* brandTitle = new QLabel("Smart Clinic", brandRow);
+    brandTitle->setObjectName("brandTitle");
+    auto* brandSubtitle = new QLabel("Patient care", brandRow);
+    brandSubtitle->setObjectName("brandSubtitle");
+    brandText->addWidget(brandTitle);
+    brandText->addWidget(brandSubtitle);
+    brandLayout->addWidget(logo);
+    brandLayout->addLayout(brandText, 1);
+    sideLayout->addWidget(brandRow);
+    sideLayout->addSpacing(22);
+
+    auto addSectionLabel = [side, sideLayout](const QString& text) {
+        auto* label = new QLabel(text, side);
+        label->setObjectName("sidebarSection");
+        sideLayout->addWidget(label);
+    };
+    auto addNavigationButton = [this, side, sideLayout](int index, const QString& text) {
+        auto* button = new QPushButton(text, side);
+        button->setObjectName("sidebarNavButton");
+        button->setCheckable(true);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setMinimumHeight(40);
+        button->setIconSize(QSize(20, 20));
+        button->setIcon(sidebarIcon(index, QColor("#718096")));
+        button->setProperty("active", false);
+        navigationButtons[static_cast<std::size_t>(index)] = button;
+        sideLayout->addWidget(button);
+        connect(button, &QPushButton::clicked, this, [this, index]() { setCurrentPage(index); });
+    };
+
+    addSectionLabel("CLINIC");
+    addNavigationButton(0, "Dashboard");
+    addNavigationButton(1, "Patients");
+    addNavigationButton(2, "Appointments");
+    addNavigationButton(3, "Waiting Queue");
+    sideLayout->addSpacing(13);
+    addSectionLabel("MANAGEMENT");
+    addNavigationButton(4, "Search & Sort");
+    addNavigationButton(5, "Reports");
+    sideLayout->addStretch(1);
+
+    auto* illustration = new QLabel(side);
+    illustration->setObjectName("sidebarIllustration");
+    illustration->setAlignment(Qt::AlignCenter);
+    illustration->setFixedHeight(174);
+    const QPixmap illustrationImage(":/assets/sidebar-care-illustration.png");
+    if (!illustrationImage.isNull()) {
+        const QPixmap wideIllustration = illustrationImage.scaledToWidth(
+            204, Qt::SmoothTransformation);
+        const int cropTop = qMin(24, qMax(0, wideIllustration.height() - 174));
+        illustration->setPixmap(wideIllustration.copy(0, cropTop, 204, 174));
+    }
+    sideLayout->addWidget(illustration);
+
     pages = new QStackedWidget(root);
     pages->addWidget(makeDashboardPage());
     pages->addWidget(makePatientsPage());
@@ -234,13 +377,10 @@ void MainWindow::buildUi() {
     rootLayout->addWidget(side); rootLayout->addWidget(pages, 1);
     setCentralWidget(root);
 
-    connect(navigation, &QListWidget::currentRowChanged, pages, &QStackedWidget::setCurrentIndex);
-    connect(navigation, &QListWidget::currentTextChanged, this, [this](const QString& title) {
-        statusBar()->showMessage(title, 2500);
-    });
+    setCurrentPage(0);
     auto* findShortcut = new QShortcut(QKeySequence::Find, this);
     connect(findShortcut, &QShortcut::activated, this, [this]() {
-        navigation->setCurrentRow(4); queryText->setFocus(); queryText->selectAll();
+        setCurrentPage(4); queryText->setFocus(); queryText->selectAll();
     });
     auto* undoShortcut = new QShortcut(QKeySequence("Ctrl+Z"), this);
     connect(undoShortcut, &QShortcut::activated, this, &MainWindow::onUndo);
@@ -249,10 +389,13 @@ void MainWindow::buildUi() {
     setStyleSheet(
         "QMainWindow{background:#f5f7fb;color:#253247;} QWidget{color:#253247;}"
         "#sidebar{background:#ffffff;border-right:1px solid #e4e9f0;}"
-        "#brandLabel{font-size:18px;font-weight:700;color:#3157a4;padding:20px 8px;}"
-        "#navigation{border:0;background:#fff;padding:8px;}"
-        "#navigation::item{padding:12px;border-radius:7px;color:#59677a;}"
-        "#navigation::item:selected{background:#eaf0ff;color:#3157a4;font-weight:600;}"
+        "#brandTitle{font-size:15px;font-weight:700;color:#253247;}"
+        "#brandSubtitle{font-size:10px;color:#8a96a8;}"
+        "#sidebarSection{font-size:10px;font-weight:700;color:#9aa5b5;padding:0 8px;margin-top:5px;margin-bottom:5px;}"
+        "QPushButton#sidebarNavButton{height:40px;text-align:left;padding:0 11px;border:0;border-radius:9px;background:transparent;color:#64748b;font-size:13px;font-weight:500;}"
+        "QPushButton#sidebarNavButton:hover{background:#f5f7fb;}"
+        "QPushButton#sidebarNavButton[active=\"true\"]{background:#edf3ff;color:#2860d7;font-weight:700;}"
+        "#sidebarIllustration{background:transparent;}"
         "#statCard{background:#fff;border:1px solid #e4e9f0;border-radius:10px;}"
         "#mutedText{color:#778397;} QLineEdit,QComboBox,QSpinBox,QDateTimeEdit{color:#253247;padding:7px;border:1px solid #d8dee8;border-radius:5px;background:white;}"
         "QPushButton{padding:8px 13px;background:#3157a4;color:white;border:0;border-radius:5px;}"
@@ -260,6 +403,24 @@ void MainWindow::buildUi() {
         "QHeaderView::section{background:#f4f6fa;color:#657186;padding:8px;border:0;font-weight:600;}"
         "QGroupBox{font-weight:600;border:1px solid #e0e6ee;border-radius:8px;margin-top:10px;padding-top:12px;background:white;}"
         "QGroupBox::title{subcontrol-origin:margin;left:12px;padding:0 4px;}");
+}
+
+void MainWindow::setCurrentPage(int pageIndex) {
+    if (!pages || pageIndex < 0 || pageIndex >= pages->count()) return;
+    pages->setCurrentIndex(pageIndex);
+    const QColor activeColor("#2860d7");
+    const QColor inactiveColor("#718096");
+    for (std::size_t i = 0; i < navigationButtons.size(); ++i) {
+        auto* button = navigationButtons[i];
+        if (!button) continue;
+        const bool active = static_cast<int>(i) == pageIndex;
+        button->setChecked(active);
+        button->setProperty("active", active);
+        button->setIcon(sidebarIcon(static_cast<int>(i), active ? activeColor : inactiveColor));
+        button->style()->unpolish(button);
+        button->style()->polish(button);
+    }
+    statusBar()->showMessage(navigationButtons[static_cast<std::size_t>(pageIndex)]->text(), 2500);
 }
 
 QTableWidget* MainWindow::makeTable(const QStringList& headers, QWidget* parent) {
@@ -288,8 +449,8 @@ QWidget* MainWindow::makeDashboardPage() {
     auto* schedule = new QPushButton("Schedule appointment", page);
     actions->addWidget(add); actions->addWidget(schedule); actions->addStretch();
     layout->addLayout(actions);
-    connect(add,&QPushButton::clicked,this,[this](){navigation->setCurrentRow(1);patientName->setFocus();});
-    connect(schedule,&QPushButton::clicked,this,[this](){navigation->setCurrentRow(2);appointmentPatientId->setFocus();});
+    connect(add,&QPushButton::clicked,this,[this](){setCurrentPage(1);patientName->setFocus();});
+    connect(schedule,&QPushButton::clicked,this,[this](){setCurrentPage(2);appointmentPatientId->setFocus();});
     return page;
 }
 

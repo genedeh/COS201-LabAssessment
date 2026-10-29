@@ -66,6 +66,8 @@ View: gui/MainWindow
 
 The application includes JSON load/save, field validation, exception dialogs, a timer-based appointment reminder, Ctrl+S, Ctrl+Q, Ctrl+F, and Ctrl+Z shortcuts, status messages, and custom category table styles.
 
+The sidebar groups clinic and management navigation, highlights the active page, and uses the bundled clinic logo, care illustration, and six matching SVG icons. When QtSvg is available, the SVG resources are rendered directly; installations without QtSvg use matching vector-drawn icons so the application remains buildable with the base Qt Widgets package.
+
 ## Suggested manual walkthrough
 
 1. Open **Dashboard** and confirm that sample patients and today's appointments are shown.
