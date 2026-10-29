@@ -28,6 +28,7 @@
 #include <QIcon>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPaintEvent>
 #include <QPixmap>
 #include <QPropertyAnimation>
 #include <QPushButton>
@@ -58,6 +59,78 @@
 namespace {
 QString q(const std::string& value) { return QString::fromStdString(value); }
 std::string s(const QString& value) { return value.toUtf8().toStdString(); }
+
+void paintChevron(QPainter& painter, const QRectF& bounds, bool pointsUp, const QColor& color) {
+#ifdef SCAPMS_HAS_QT_SVG
+    QSvgRenderer renderer(QString(":/icons/") + (pointsUp ? "chevron-up.svg" : "chevron-down.svg"));
+    if (renderer.isValid()) {
+        renderer.render(&painter, bounds);
+        return;
+    }
+#endif
+    const qreal midX = bounds.center().x();
+    const qreal midY = bounds.center().y();
+    const qreal halfWidth = bounds.width() * 0.34;
+    const qreal halfHeight = bounds.height() * 0.22;
+    QPainterPath chevron;
+    if (pointsUp) {
+        chevron.moveTo(midX - halfWidth, midY + halfHeight);
+        chevron.lineTo(midX, midY - halfHeight);
+        chevron.lineTo(midX + halfWidth, midY + halfHeight);
+    } else {
+        chevron.moveTo(midX - halfWidth, midY - halfHeight);
+        chevron.lineTo(midX, midY + halfHeight);
+        chevron.lineTo(midX + halfWidth, midY - halfHeight);
+    }
+    painter.setPen(QPen(color, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPath(chevron);
+}
+
+class ChevronComboBox final : public QComboBox {
+public:
+    using QComboBox::QComboBox;
+
+protected:
+    void paintEvent(QPaintEvent* event) override {
+        QComboBox::paintEvent(event);
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        paintChevron(painter, QRectF(width() - 25, (height() - 14) / 2.0, 14, 14),
+                     false, isEnabled() ? QColor("#64748b") : QColor("#aab3c0"));
+    }
+};
+
+class ChevronSpinBox final : public QSpinBox {
+public:
+    using QSpinBox::QSpinBox;
+
+protected:
+    void paintEvent(QPaintEvent* event) override {
+        QSpinBox::paintEvent(event);
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        const qreal centerX = width() - 12.5;
+        const qreal centerY = height() / 2.0;
+        const QColor color = isEnabled() ? QColor("#64748b") : QColor("#aab3c0");
+        paintChevron(painter, QRectF(centerX - 6, centerY - 12, 12, 12), true, color);
+        paintChevron(painter, QRectF(centerX - 6, centerY + 1, 12, 12), false, color);
+    }
+};
+
+class ChevronDateTimeEdit final : public QDateTimeEdit {
+public:
+    using QDateTimeEdit::QDateTimeEdit;
+
+protected:
+    void paintEvent(QPaintEvent* event) override {
+        QDateTimeEdit::paintEvent(event);
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        paintChevron(painter, QRectF(width() - 25, (height() - 14) / 2.0, 14, 14),
+                     false, isEnabled() ? QColor("#64748b") : QColor("#aab3c0"));
+    }
+};
 
 void configureTable(QTableWidget* table) {
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -511,16 +584,15 @@ void MainWindow::buildUi() {
         "QTableWidget#dashboardAppointmentsTable QHeaderView::section{background:#ffffff;color:#667085;border:0;border-bottom:1px solid #e6ebf2;padding:11px 9px;font-weight:600;}"
         "#mutedText{color:#778397;} QLineEdit,QComboBox,QSpinBox,QDateTimeEdit{color:#253247;padding:8px 10px;border:1px solid #d8dee8;border-radius:7px;background:#ffffff;}"
         "QComboBox::drop-down{ subcontrol-origin:padding;subcontrol-position:top right;width:30px;border:0;background:transparent;}"
-        "QComboBox::down-arrow{image:url(:/icons/chevron-down.svg);width:12px;height:12px;}"
+        "QComboBox::down-arrow{image:none;width:0;height:0;}"
         "QComboBox QAbstractItemView{background:#ffffff;color:#253247;border:1px solid #e1e7ef;selection-background-color:#edf3ff;selection-color:#3157a4;outline:0;padding:4px;}"
         "QSpinBox::up-button,QSpinBox::down-button{width:25px;border:0;border-left:1px solid #e6ebf2;background:#f8faff;}"
         "QSpinBox::up-button{subcontrol-origin:border;subcontrol-position:top right;border-top-right-radius:6px;}"
         "QSpinBox::down-button{subcontrol-origin:border;subcontrol-position:bottom right;border-bottom-right-radius:6px;}"
         "QSpinBox::up-button:hover,QSpinBox::down-button:hover{background:#edf3ff;}"
-        "QSpinBox::up-arrow{image:url(:/icons/chevron-up.svg);width:11px;height:11px;}"
-        "QSpinBox::down-arrow{image:url(:/icons/chevron-down.svg);width:11px;height:11px;}"
+        "QSpinBox::up-arrow,QSpinBox::down-arrow{image:none;width:0;height:0;}"
         "QDateTimeEdit::drop-down{subcontrol-origin:padding;subcontrol-position:top right;width:30px;border:0;background:transparent;}"
-        "QDateTimeEdit::down-arrow{image:url(:/icons/chevron-down.svg);width:12px;height:12px;}"
+        "QDateTimeEdit::down-arrow{image:none;width:0;height:0;}"
         "QPushButton{padding:8px 13px;background:#3157a4;color:white;border:0;border-radius:5px;}"
         "QPushButton:hover{background:#27488b;} QTableWidget{color:#253247;background:white;border:1px solid #e2e7ef;gridline-color:#edf0f5;} QTableWidget::item{color:#253247;}"
         "QHeaderView::section{background:#f4f6fa;color:#657186;padding:8px;border:0;font-weight:600;}"
@@ -716,7 +788,7 @@ QWidget* MainWindow::makePatientsPage() {
     queryText = new QLineEdit(controls);
     queryText->setPlaceholderText("Search by patient ID, name, or category");
     queryText->setToolTip("Search does not change the frequently accessed patient cache.");
-    queryMethod = new QComboBox(controls);
+    queryMethod = new ChevronComboBox(controls);
     queryMethod->addItems({"Linear by ID", "Binary by ID", "Recursive by name", "Category"});
     auto* searchButton = new QPushButton("Search", controls);
     auto* clearSearch = new QPushButton("Clear", controls);
@@ -727,10 +799,10 @@ QWidget* MainWindow::makePatientsPage() {
     searchRow->addWidget(clearSearch);
     auto* sortRow = new QHBoxLayout();
     auto* algorithmLabel = new QLabel("Algorithm", controls);
-    sortAlgorithm = new QComboBox(controls);
+    sortAlgorithm = new ChevronComboBox(controls);
     sortAlgorithm->addItems({"Insertion sort", "Selection sort"});
     auto* sortByLabel = new QLabel("Sort by", controls);
-    sortField = new QComboBox(controls);
+    sortField = new ChevronComboBox(controls);
     sortField->addItems({"Patient name", "Patient ID", "Age", "Next appointment"});
     auto* sortButton = new QPushButton("Apply sort", controls);
     sortRow->addWidget(algorithmLabel);
@@ -795,12 +867,12 @@ QWidget* MainWindow::makePatientsPage() {
     patientId->setToolTip("Unique patient identifier");
     patientName = new QLineEdit(patientDrawer);
     patientName->setPlaceholderText("Full name");
-    patientAge = new QSpinBox(patientDrawer);
+    patientAge = new ChevronSpinBox(patientDrawer);
     patientAge->setRange(0, 120);
     patientAge->setValue(25);
     patientContact = new QLineEdit(patientDrawer);
     patientContact->setPlaceholderText("Phone or contact details");
-    patientCategory = new QComboBox(patientDrawer);
+    patientCategory = new ChevronComboBox(patientDrawer);
     patientCategory->addItems({"General", "Emergency", "Follow-up"});
     auto* detailRow = new QWidget(patientDrawer);
     auto* detailLayout = new QVBoxLayout(detailRow);
@@ -867,7 +939,7 @@ QWidget* MainWindow::makeAppointmentsPage() {
     auto* heading=new QLabel("Appointment management",page);QFont f=heading->font();f.setPointSize(20);f.setBold(true);heading->setFont(f);layout->addWidget(heading);
     auto* box=new QGroupBox("Schedule a visit",page);auto* form=new QGridLayout(box);
     appointmentPatientId=new QLineEdit(box);appointmentPatientId->setPlaceholderText("PT0001");
-    appointmentDateTime=new QDateTimeEdit(QDateTime::currentDateTime().addDays(1),box);appointmentDateTime->setCalendarPopup(true);appointmentDateTime->setDisplayFormat("yyyy-MM-dd HH:mm");
+    appointmentDateTime=new ChevronDateTimeEdit(QDateTime::currentDateTime().addDays(1),box);appointmentDateTime->setCalendarPopup(true);appointmentDateTime->setDisplayFormat("yyyy-MM-dd HH:mm");
     appointmentReason=new QLineEdit(box);appointmentReason->setPlaceholderText("Routine check-up, follow-up...");
     auto* schedule=new QPushButton("Schedule appointment",box);auto* cancel=new QPushButton("Cancel selected",box);auto* complete=new QPushButton("Mark completed",box);
     form->addWidget(new QLabel("Patient ID"),0,0);form->addWidget(appointmentPatientId,0,1);form->addWidget(new QLabel("Date and time"),0,2);form->addWidget(appointmentDateTime,0,3);
