@@ -31,6 +31,7 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QStackedLayout>
 #include <QStackedWidget>
 #include <QShortcut>
 #include <QStatusBar>
@@ -69,6 +70,7 @@ void configureTable(QTableWidget* table) {
 
 QLabel* cardValue(const QString& value, QWidget* parent) {
     auto* label = new QLabel(value, parent);
+    label->setObjectName("statValue");
     QFont font = label->font(); font.setPointSize(21); font.setBold(true); label->setFont(font);
     return label;
 }
@@ -158,14 +160,36 @@ QIcon sidebarIcon(int index, const QColor& color) {
     return QIcon(pixmap);
 }
 
-QFrame* makeStatCard(const QString& title, QLabel*& value, QWidget* parent) {
+QFrame* makeStatCard(const QString& title, const QString& description,
+                     QLabel*& value, int iconIndex, QWidget* parent) {
     auto* frame = new QFrame(parent);
     frame->setObjectName("statCard");
+    frame->setMinimumHeight(126);
     auto* layout = new QVBoxLayout(frame);
+    layout->setContentsMargins(16, 12, 16, 12);
+    layout->setSpacing(3);
+
+    auto* topRow = new QHBoxLayout();
     auto* caption = new QLabel(title, frame);
     caption->setObjectName("mutedText");
+    caption->setWordWrap(true);
+    auto* iconShell = new QFrame(frame);
+    iconShell->setObjectName("statIconShell");
+    iconShell->setFixedSize(48, 48);
+    auto* iconLayout = new QVBoxLayout(iconShell);
+    iconLayout->setContentsMargins(4, 4, 4, 4);
+    auto* icon = new QLabel(iconShell);
+    icon->setAlignment(Qt::AlignCenter);
+    icon->setPixmap(sidebarIcon(iconIndex, QColor("#3265db")).pixmap(QSize(38, 38)));
+    iconLayout->addWidget(icon);
+    topRow->addWidget(caption, 1, Qt::AlignVCenter);
+    topRow->addWidget(iconShell, 0, Qt::AlignRight | Qt::AlignTop);
     value = cardValue("0", frame);
-    layout->addWidget(caption); layout->addWidget(value);
+    auto* detail = new QLabel(description, frame);
+    detail->setObjectName("statDescription");
+    layout->addLayout(topRow);
+    layout->addWidget(value);
+    layout->addWidget(detail);
     return frame;
 }
 } // namespace
@@ -404,7 +428,14 @@ void MainWindow::buildUi() {
         "QPushButton#welcomeSecondaryButton:hover{background:rgba(255,255,255,28);}"
         "QPushButton#dashboardViewAll{background:transparent;color:#3157a4;border:0;padding:5px 8px;font-weight:600;}"
         "QPushButton#dashboardViewAll:hover{background:#edf3ff;}"
-        "#statCard{background:#fff;border:1px solid #e4e9f0;border-radius:11px;}"
+        "#statCard{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #f8faff,stop:1 #edf4ff);border:1px solid #dce8ff;border-top:3px solid #5c7bec;border-radius:11px;}"
+        "#statIconShell{background:#e3edff;border:1px solid #d2e1ff;border-radius:14px;}"
+        "#statValue{color:#244bb5;font-size:25px;}"
+        "#statDescription{color:#7b8ba6;font-size:10px;}"
+        "#appointmentsCard{background:#ffffff;border:1px solid #e5eaf2;border-radius:12px;}"
+        "QTableWidget#dashboardAppointmentsTable{background:#ffffff;alternate-background-color:#f8faff;border:0;gridline-color:transparent;selection-background-color:#f0f5ff;outline:0;}"
+        "QTableWidget#dashboardAppointmentsTable::item{border:0;padding:10px 9px;color:#344054;}"
+        "QTableWidget#dashboardAppointmentsTable QHeaderView::section{background:#ffffff;color:#667085;border:0;border-bottom:1px solid #e6ebf2;padding:11px 9px;font-weight:600;}"
         "#mutedText{color:#778397;} QLineEdit,QComboBox,QSpinBox,QDateTimeEdit{color:#253247;padding:7px;border:1px solid #d8dee8;border-radius:5px;background:white;}"
         "QPushButton{padding:8px 13px;background:#3157a4;color:white;border:0;border-radius:5px;}"
         "QPushButton:hover{background:#27488b;} QTableWidget{color:#253247;background:white;border:1px solid #e2e7ef;gridline-color:#edf0f5;} QTableWidget::item{color:#253247;}"
@@ -458,12 +489,19 @@ QWidget* MainWindow::makeDashboardPage() {
     headingRow->addWidget(dashboardDateLabel);
     layout->addLayout(headingRow);
 
-    auto* welcomeBanner = new QFrame(page);
+    auto* bannerContainer = new QWidget(page);
+    bannerContainer->setObjectName("welcomeBannerContainer");
+    bannerContainer->setFixedHeight(220);
+    auto* bannerStack = new QStackedLayout(bannerContainer);
+    bannerStack->setStackingMode(QStackedLayout::StackAll);
+    bannerStack->setContentsMargins(0, 0, 0, 0);
+
+    auto* welcomeBanner = new QFrame(bannerContainer);
     welcomeBanner->setObjectName("welcomeBanner");
-    welcomeBanner->setMinimumHeight(174);
+    welcomeBanner->setFixedHeight(176);
     auto* bannerLayout = new QHBoxLayout(welcomeBanner);
-    bannerLayout->setContentsMargins(22, 17, 14, 14);
-    bannerLayout->setSpacing(8);
+    bannerLayout->setContentsMargins(22, 15, 18, 17);
+    bannerLayout->setSpacing(0);
 
     auto* welcomeContent = new QVBoxLayout();
     welcomeContent->setSpacing(8);
@@ -488,26 +526,34 @@ QWidget* MainWindow::makeDashboardPage() {
     welcomeActions->addStretch();
     welcomeContent->addWidget(welcomeTitle);
     welcomeContent->addWidget(dashboardWelcomeSummary);
-    welcomeContent->addLayout(welcomeActions);
     welcomeContent->addStretch();
+    welcomeContent->addLayout(welcomeActions);
+    bannerLayout->addLayout(welcomeContent, 1);
+    bannerLayout->addSpacing(260);
+    bannerStack->addWidget(welcomeBanner);
+    bannerStack->setAlignment(welcomeBanner, Qt::AlignTop);
 
-    auto* dashboardIllustration = new QLabel(welcomeBanner);
+    auto* dashboardIllustration = new QLabel(bannerContainer);
     dashboardIllustration->setObjectName("dashboardIllustration");
     dashboardIllustration->setAlignment(Qt::AlignCenter);
-    dashboardIllustration->setMinimumWidth(225);
+    dashboardIllustration->setFixedSize(350, 220);
+    dashboardIllustration->setAttribute(Qt::WA_TransparentForMouseEvents);
     const QPixmap illustration(":/assets/dashboard-care-illustration.png");
     if (!illustration.isNull())
-        dashboardIllustration->setPixmap(illustration.scaled(300, 172, Qt::KeepAspectRatio,
+        dashboardIllustration->setPixmap(illustration.scaled(350, 220, Qt::KeepAspectRatio,
                                                              Qt::SmoothTransformation));
-    bannerLayout->addLayout(welcomeContent, 1);
-    bannerLayout->addWidget(dashboardIllustration);
-    layout->addWidget(welcomeBanner);
+    bannerStack->addWidget(dashboardIllustration);
+    bannerStack->setAlignment(dashboardIllustration, Qt::AlignRight | Qt::AlignTop);
+    layout->addWidget(bannerContainer);
 
     auto* cards = new QHBoxLayout();
     cards->setSpacing(14);
-    cards->addWidget(makeStatCard("Registered patients", patientCountCard, page));
-    cards->addWidget(makeStatCard("Appointments today", appointmentCountCard, page));
-    cards->addWidget(makeStatCard("Patients waiting", waitingCountCard, page));
+    cards->addWidget(makeStatCard("Registered patients", "Across all care categories",
+                                  patientCountCard, 1, page));
+    cards->addWidget(makeStatCard("Appointments today", "On today's schedule",
+                                  appointmentCountCard, 2, page));
+    cards->addWidget(makeStatCard("Patients waiting", "In the consultation queue",
+                                  waitingCountCard, 3, page));
     layout->addLayout(cards);
 
     auto* appointmentHeadingRow = new QHBoxLayout();
@@ -518,14 +564,26 @@ QWidget* MainWindow::makeDashboardPage() {
     section->setFont(sectionFont);
     auto* viewAll = new QPushButton("View all  →", page);
     viewAll->setObjectName("dashboardViewAll");
+    appointmentHeadingRow->setContentsMargins(8, 0, 8, 0);
     appointmentHeadingRow->addWidget(section);
     appointmentHeadingRow->addStretch();
     appointmentHeadingRow->addWidget(viewAll);
     layout->addLayout(appointmentHeadingRow);
 
     dashboardTable = makeTable({"Time", "Patient", "Category", "Visit purpose", "Status"}, page);
-    dashboardTable->verticalHeader()->setDefaultSectionSize(38);
-    layout->addWidget(dashboardTable, 1);
+    dashboardTable->setObjectName("dashboardAppointmentsTable");
+    dashboardTable->setShowGrid(false);
+    dashboardTable->setAlternatingRowColors(true);
+    dashboardTable->setSelectionMode(QAbstractItemView::NoSelection);
+    dashboardTable->setFocusPolicy(Qt::NoFocus);
+    dashboardTable->verticalHeader()->setDefaultSectionSize(46);
+    auto* appointmentCard = new QFrame(page);
+    appointmentCard->setObjectName("appointmentsCard");
+    auto* appointmentCardLayout = new QVBoxLayout(appointmentCard);
+    appointmentCardLayout->setContentsMargins(12, 3, 12, 8);
+    appointmentCardLayout->setSpacing(0);
+    appointmentCardLayout->addWidget(dashboardTable);
+    layout->addWidget(appointmentCard, 1);
 
     connect(add,&QPushButton::clicked,this,[this](){setCurrentPage(1);patientName->setFocus();});
     connect(schedule,&QPushButton::clicked,this,[this](){setCurrentPage(2);appointmentPatientId->setFocus();});
@@ -685,15 +743,13 @@ void MainWindow::refreshDashboard(){
         dashboardTable->setItem(row, 3, new QTableWidgetItem(q(appointment->getReason())));
 
         auto* status = new QTableWidgetItem(q(scapms::model::appointmentStatusName(appointment->getStatus())));
+        status->setTextAlignment(Qt::AlignCenter);
         if (appointment->getStatus() == scapms::model::AppointmentStatus::Pending) {
             status->setForeground(QBrush(QColor("#067647")));
-            status->setBackground(QBrush(QColor("#ecfdf3")));
         } else if (appointment->getStatus() == scapms::model::AppointmentStatus::Completed) {
             status->setForeground(QBrush(QColor("#475467")));
-            status->setBackground(QBrush(QColor("#f2f4f7")));
         } else {
             status->setForeground(QBrush(QColor("#b42318")));
-            status->setBackground(QBrush(QColor("#fff1f0")));
         }
         dashboardTable->setItem(row, 4, status);
     }
