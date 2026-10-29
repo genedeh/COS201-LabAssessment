@@ -357,14 +357,11 @@ void MainWindow::buildUi() {
     auto* illustration = new QLabel(side);
     illustration->setObjectName("sidebarIllustration");
     illustration->setAlignment(Qt::AlignCenter);
-    illustration->setFixedHeight(174);
+    illustration->setFixedHeight(184);
     const QPixmap illustrationImage(":/assets/sidebar-care-illustration.png");
-    if (!illustrationImage.isNull()) {
-        const QPixmap wideIllustration = illustrationImage.scaledToWidth(
-            204, Qt::SmoothTransformation);
-        const int cropTop = qMin(24, qMax(0, wideIllustration.height() - 174));
-        illustration->setPixmap(wideIllustration.copy(0, cropTop, 204, 174));
-    }
+    if (!illustrationImage.isNull())
+        illustration->setPixmap(illustrationImage.scaled(184, 184, Qt::KeepAspectRatio,
+                                                          Qt::SmoothTransformation));
     sideLayout->addWidget(illustration);
 
     pages = new QStackedWidget(root);
