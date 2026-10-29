@@ -29,6 +29,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
+#include <QPropertyAnimation>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStackedLayout>
@@ -90,13 +91,13 @@ void showClinicMessage(QWidget* parent, QMessageBox::Icon icon,
 QIcon sidebarIcon(int index, const QColor& color) {
     static const char* const paths[] = {
         ":/icons/dashboard.svg", ":/icons/patients.svg", ":/icons/appointments.svg",
-        ":/icons/queue.svg", ":/icons/search-sort.svg", ":/icons/reports.svg"
+        ":/icons/queue.svg", ":/icons/reports.svg"
     };
     QPixmap pixmap(48, 48);
     pixmap.fill(Qt::transparent);
 
 #ifdef SCAPMS_HAS_QT_SVG
-    if (index >= 0 && index < 6) {
+    if (index >= 0 && index < 5) {
         QSvgRenderer renderer(QString::fromLatin1(paths[index]));
         if (renderer.isValid()) {
             QPainter svgPainter(&pixmap);
@@ -149,9 +150,6 @@ QIcon sidebarIcon(int index, const QColor& color) {
         }
         break;
     case 4:
-        painter.drawEllipse(QRectF(4, 4, 13, 13));
-        painter.drawLine(QPointF(15, 15), QPointF(21, 21)); break;
-    case 5:
         painter.drawLine(QPointF(3.5, 20.5), QPointF(21, 20.5));
         painter.drawRoundedRect(QRectF(5, 12, 3.5, 5), 0.8, 0.8);
         painter.drawRoundedRect(QRectF(10.5, 8, 3.5, 9), 0.8, 0.8);
@@ -202,6 +200,18 @@ QIcon tableMarkerIcon(const QString& kind, const QColor& color) {
         painter.drawPath(alert);
         painter.drawLine(QPointF(12, 9), QPointF(12, 14));
         painter.drawPoint(QPointF(12, 17));
+    } else if (kind == "edit") {
+        QPainterPath pencil;
+        pencil.moveTo(5, 17); pencil.lineTo(15.7, 6.3); pencil.lineTo(19, 9.6);
+        pencil.lineTo(8.3, 20.3); pencil.lineTo(4, 21); pencil.closeSubpath();
+        painter.drawPath(pencil);
+        painter.drawLine(QPointF(14.3, 7.7), QPointF(17.6, 11));
+    } else if (kind == "delete") {
+        painter.drawRoundedRect(QRectF(6, 8, 12, 13), 1.5, 1.5);
+        painter.drawLine(QPointF(4, 6), QPointF(20, 6));
+        painter.drawLine(QPointF(9, 4), QPointF(15, 4));
+        painter.drawLine(QPointF(10, 11), QPointF(10, 18));
+        painter.drawLine(QPointF(14, 11), QPointF(14, 18));
     }
     return QIcon(pixmap);
 }
@@ -420,8 +430,7 @@ void MainWindow::buildUi() {
     addNavigationButton(3, "Waiting Queue");
     sideLayout->addSpacing(13);
     addSectionLabel("MANAGEMENT");
-    addNavigationButton(4, "Search & Sort");
-    addNavigationButton(5, "Reports");
+    addNavigationButton(4, "Reports");
     sideLayout->addStretch(1);
 
     auto* illustration = new QLabel(side);
@@ -439,7 +448,6 @@ void MainWindow::buildUi() {
     pages->addWidget(makePatientsPage());
     pages->addWidget(makeAppointmentsPage());
     pages->addWidget(makeQueuePage());
-    pages->addWidget(makeSearchPage());
     pages->addWidget(makeReportsPage());
     rootLayout->addWidget(side); rootLayout->addWidget(pages, 1);
     setCentralWidget(root);
@@ -447,7 +455,7 @@ void MainWindow::buildUi() {
     setCurrentPage(0);
     auto* findShortcut = new QShortcut(QKeySequence::Find, this);
     connect(findShortcut, &QShortcut::activated, this, [this]() {
-        setCurrentPage(4); queryText->setFocus(); queryText->selectAll();
+        setCurrentPage(1); queryText->setFocus(); queryText->selectAll();
     });
     auto* undoShortcut = new QShortcut(QKeySequence("Ctrl+Z"), this);
     connect(undoShortcut, &QShortcut::activated, this, &MainWindow::onUndo);
@@ -478,6 +486,23 @@ void MainWindow::buildUi() {
         "#statIconShell{background:#e3edff;border:1px solid #d2e1ff;border-radius:14px;}"
         "#statValue{color:#244bb5;font-size:25px;}"
         "#statDescription{color:#7b8ba6;font-size:10px;}"
+        "#patientCount{color:#778397;font-size:12px;}"
+        "#patientSearchControls{background:#ffffff;border:1px solid #e4e9f0;border-radius:11px;}"
+        "#patientDrawer{background:#ffffff;border-left:1px solid #e2e8f0;}"
+        "#patientOverlay{background:rgba(25,35,60,105);}"
+        "#patientDrawerTitle{font-size:18px;font-weight:700;color:#253247;}"
+        "#drawerHint{color:#778397;font-size:11px;}"
+        "QPushButton#addPatientButton{background:#3157a4;color:#ffffff;border:0;border-radius:7px;padding:10px 15px;font-weight:600;}"
+        "QPushButton#addPatientButton:hover{background:#27488b;}"
+        "QPushButton#drawerPrimaryButton{background:#3157a4;color:#ffffff;border:0;border-radius:7px;padding:9px 15px;font-weight:600;}"
+        "QPushButton#drawerPrimaryButton:hover{background:#27488b;}"
+        "QPushButton#drawerCancelButton{background:#f2f4f7;color:#344054;border:1px solid #d0d5dd;border-radius:7px;padding:9px 15px;}"
+        "QPushButton#drawerCancelButton:hover{background:#e9edf3;}"
+        "QPushButton#patientActionButton{background:transparent;color:#667085;border:0;border-radius:6px;padding:2px;font-size:18px;}"
+        "QPushButton#patientActionButton:hover{background:#edf3ff;color:#3157a4;}"
+        "QTableWidget#patientRecordsTable{background:#ffffff;alternate-background-color:#f8faff;border:0;gridline-color:transparent;selection-background-color:#edf3ff;outline:0;}"
+        "QTableWidget#patientRecordsTable::item{border:0;padding:9px 8px;color:#344054;}"
+        "QTableWidget#patientRecordsTable QHeaderView::section{background:#ffffff;color:#667085;border:0;border-bottom:1px solid #e6ebf2;padding:11px 8px;font-weight:600;}"
         "#appointmentsCard{background:#ffffff;border:1px solid #e5eaf2;border-radius:12px;}"
         "QTableWidget#dashboardAppointmentsTable{background:#ffffff;alternate-background-color:#f8faff;border:0;gridline-color:transparent;selection-background-color:#f0f5ff;outline:0;}"
         "QTableWidget#dashboardAppointmentsTable::item{border:0;padding:10px 9px;color:#344054;}"
@@ -492,6 +517,7 @@ void MainWindow::buildUi() {
 
 void MainWindow::setCurrentPage(int pageIndex) {
     if (!pages || pageIndex < 0 || pageIndex >= pages->count()) return;
+    if (pageIndex != 1 && patientOverlay && patientOverlay->isVisible()) closePatientDrawer();
     pages->setCurrentIndex(pageIndex);
     const QColor activeColor("#2860d7");
     const QColor inactiveColor("#718096");
@@ -632,38 +658,188 @@ QWidget* MainWindow::makeDashboardPage() {
     appointmentCardLayout->addWidget(dashboardTable);
     layout->addWidget(appointmentCard, 1);
 
-    connect(add,&QPushButton::clicked,this,[this](){setCurrentPage(1);patientName->setFocus();});
+    connect(add,&QPushButton::clicked,this,[this](){setCurrentPage(1);openPatientDrawer();});
     connect(schedule,&QPushButton::clicked,this,[this](){setCurrentPage(2);appointmentPatientId->setFocus();});
     connect(viewAll,&QPushButton::clicked,this,[this](){setCurrentPage(2);});
     return page;
 }
 
 QWidget* MainWindow::makePatientsPage() {
-    auto* page=new QWidget(this); auto* layout=new QVBoxLayout(page);
-    auto* heading=new QLabel("Patient records",page); QFont f=heading->font();f.setPointSize(20);f.setBold(true);heading->setFont(f);layout->addWidget(heading);
-    auto* box=new QGroupBox("Register or edit a patient",page); auto* form=new QGridLayout(box);
-    patientId=new QLineEdit(box); patientId->setPlaceholderText("Auto-generated when blank"); patientId->setToolTip("Unique patient identifier");
-    patientName=new QLineEdit(box); patientName->setPlaceholderText("Full name");
-    patientAge=new QSpinBox(box);patientAge->setRange(0,120);patientAge->setValue(25);
-    patientContact=new QLineEdit(box);patientContact->setPlaceholderText("Phone or contact details");
-    patientCategory=new QComboBox(box);patientCategory->addItems({"General","Emergency","Follow-up"});
-    patientDetailLabel=new QLabel("Emergency priority (1-5)",box);patientDetail=new QLineEdit(box);patientDetail->setText("1");
-    form->addWidget(new QLabel("Patient ID"),0,0);form->addWidget(patientId,0,1);
-    form->addWidget(new QLabel("Full name"),0,2);form->addWidget(patientName,0,3);
-    form->addWidget(new QLabel("Age"),1,0);form->addWidget(patientAge,1,1);
-    form->addWidget(new QLabel("Contact"),1,2);form->addWidget(patientContact,1,3);
-    form->addWidget(new QLabel("Category"),2,0);form->addWidget(patientCategory,2,1);
-    form->addWidget(patientDetailLabel,2,2);form->addWidget(patientDetail,2,3);
-    auto* add=new QPushButton("Register patient",box);auto* edit=new QPushButton("Save edits",box);auto* remove=new QPushButton("Delete patient",box);auto* clear=new QPushButton("Clear form",box);auto* undo=new QPushButton("Undo last admin action",box);
-    form->addWidget(add,3,0);form->addWidget(edit,3,1);form->addWidget(remove,3,2);form->addWidget(clear,3,3);form->addWidget(undo,4,0,1,2);
-    layout->addWidget(box);
-    patientTable=makeTable({"Patient ID","Name","Age","Contact","Category","Category detail"},page);layout->addWidget(patientTable,1);
-    connect(patientCategory,&QComboBox::currentTextChanged,this,&MainWindow::onCategoryChanged);
-    connect(add,&QPushButton::clicked,this,&MainWindow::onAddPatient);connect(edit,&QPushButton::clicked,this,&MainWindow::onEditPatient);connect(remove,&QPushButton::clicked,this,&MainWindow::onDeletePatient);
-    connect(clear,&QPushButton::clicked,this,[this](){patientId->clear();patientName->clear();patientContact->clear();patientCategory->setCurrentIndex(0);patientAge->setValue(25);});
-    connect(undo,&QPushButton::clicked,this,&MainWindow::onUndo);
-    connect(patientTable,&QTableWidget::itemSelectionChanged,this,&MainWindow::onPatientSelection);
-    connect(patientTable,&QTableWidget::cellDoubleClicked,this,[this](int r,int c){openPatientFromTable(patientTable,r,c);});
+    auto* page = new QWidget(this);
+    auto* stack = new QStackedLayout(page);
+    stack->setStackingMode(QStackedLayout::StackAll);
+
+    auto* content = new QWidget(page);
+    auto* layout = new QVBoxLayout(content);
+    layout->setContentsMargins(24, 22, 24, 22);
+    layout->setSpacing(15);
+
+    auto* headingRow = new QHBoxLayout();
+    auto* heading = new QLabel("Patients", content);
+    QFont headingFont = heading->font();
+    headingFont.setPointSize(21);
+    headingFont.setBold(true);
+    heading->setFont(headingFont);
+    patientsCountLabel = new QLabel("0 patient records", content);
+    patientsCountLabel->setObjectName("patientCount");
+    auto* undo = new QPushButton("Undo", content);
+    undo->setToolTip("Undo the last administrative action (Ctrl+Z)");
+    auto* addPatient = new QPushButton("+  Add patient", content);
+    addPatient->setObjectName("addPatientButton");
+    headingRow->addWidget(heading);
+    headingRow->addSpacing(8);
+    headingRow->addWidget(patientsCountLabel);
+    headingRow->addStretch();
+    headingRow->addWidget(undo);
+    headingRow->addWidget(addPatient);
+    layout->addLayout(headingRow);
+
+    auto* controls = new QFrame(content);
+    controls->setObjectName("patientSearchControls");
+    auto* controlsLayout = new QVBoxLayout(controls);
+    controlsLayout->setContentsMargins(14, 12, 14, 12);
+    controlsLayout->setSpacing(10);
+    auto* searchRow = new QHBoxLayout();
+    queryText = new QLineEdit(controls);
+    queryText->setPlaceholderText("Search by patient ID, name, or category");
+    queryText->setToolTip("Search does not change the frequently accessed patient cache.");
+    queryMethod = new QComboBox(controls);
+    queryMethod->addItems({"Linear by ID", "Binary by ID", "Recursive by name", "Category"});
+    auto* searchButton = new QPushButton("Search", controls);
+    auto* clearSearch = new QPushButton("Clear", controls);
+    clearSearch->setObjectName("drawerCancelButton");
+    searchRow->addWidget(queryText, 1);
+    searchRow->addWidget(queryMethod);
+    searchRow->addWidget(searchButton);
+    searchRow->addWidget(clearSearch);
+    auto* sortRow = new QHBoxLayout();
+    auto* sortLabel = new QLabel("Sort records", controls);
+    sortAlgorithm = new QComboBox(controls);
+    sortAlgorithm->addItems({"Insertion sort", "Selection sort"});
+    sortField = new QComboBox(controls);
+    sortField->addItems({"Patient name", "Patient ID", "Age", "Next appointment"});
+    auto* sortButton = new QPushButton("Apply sort", controls);
+    sortRow->addWidget(sortLabel);
+    sortRow->addWidget(sortAlgorithm);
+    sortRow->addWidget(sortField, 1);
+    sortRow->addWidget(sortButton);
+    controlsLayout->addLayout(searchRow);
+    controlsLayout->addLayout(sortRow);
+    layout->addWidget(controls);
+
+    patientTable = makeTable({"Patient ID", "Patient", "Age", "Contact", "Category", "Care detail", "Visits", ""}, content);
+    patientTable->setObjectName("patientRecordsTable");
+    patientTable->setShowGrid(false);
+    patientTable->verticalHeader()->setDefaultSectionSize(52);
+    patientTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    patientTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    patientTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    patientTable->horizontalHeader()->setSectionResizeMode(6, QHeaderView::ResizeToContents);
+    patientTable->horizontalHeader()->setSectionResizeMode(7, QHeaderView::Fixed);
+    patientTable->setColumnWidth(7, 48);
+    layout->addWidget(patientTable, 1);
+    stack->addWidget(content);
+
+    patientOverlay = new QWidget(page);
+    patientOverlay->setObjectName("patientOverlay");
+    patientOverlay->hide();
+    auto* overlayLayout = new QHBoxLayout(patientOverlay);
+    overlayLayout->setContentsMargins(0, 0, 0, 0);
+    overlayLayout->addStretch();
+
+    patientDrawer = new QFrame(patientOverlay);
+    patientDrawer->setObjectName("patientDrawer");
+    patientDrawer->setMinimumWidth(0);
+    patientDrawer->setMaximumWidth(0);
+    patientDrawer->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+    auto* drawerLayout = new QVBoxLayout(patientDrawer);
+    drawerLayout->setContentsMargins(25, 26, 25, 22);
+    drawerLayout->setSpacing(17);
+    auto* drawerHeadingRow = new QHBoxLayout();
+    auto* drawerHeading = new QLabel("Add patient", patientDrawer);
+    drawerHeading->setObjectName("patientDrawerTitle");
+    auto* closeDrawer = new QPushButton("×", patientDrawer);
+    closeDrawer->setObjectName("drawerCancelButton");
+    closeDrawer->setFixedSize(34, 34);
+    drawerHeadingRow->addWidget(drawerHeading);
+    drawerHeadingRow->addStretch();
+    drawerHeadingRow->addWidget(closeDrawer);
+    auto* hint = new QLabel("Enter the patient's details below. The ID is generated automatically if left blank.", patientDrawer);
+    hint->setObjectName("drawerHint");
+    hint->setWordWrap(true);
+    drawerLayout->addLayout(drawerHeadingRow);
+    drawerLayout->addWidget(hint);
+    drawerLayout->addSpacing(4);
+
+    auto* form = new QFormLayout();
+    form->setLabelAlignment(Qt::AlignLeft);
+    form->setVerticalSpacing(13);
+    patientId = new QLineEdit(patientDrawer);
+    patientId->setPlaceholderText("Auto-generated");
+    patientId->setToolTip("Unique patient identifier");
+    patientName = new QLineEdit(patientDrawer);
+    patientName->setPlaceholderText("Full name");
+    patientAge = new QSpinBox(patientDrawer);
+    patientAge->setRange(0, 120);
+    patientAge->setValue(25);
+    patientContact = new QLineEdit(patientDrawer);
+    patientContact->setPlaceholderText("Phone or contact details");
+    patientCategory = new QComboBox(patientDrawer);
+    patientCategory->addItems({"General", "Emergency", "Follow-up"});
+    auto* detailRow = new QWidget(patientDrawer);
+    auto* detailLayout = new QVBoxLayout(detailRow);
+    detailLayout->setContentsMargins(0, 0, 0, 0);
+    detailLayout->setSpacing(5);
+    patientDetailLabel = new QLabel("Priority level (1-5)", detailRow);
+    patientDetail = new QLineEdit(detailRow);
+    patientDetail->setText("1");
+    detailLayout->addWidget(patientDetailLabel);
+    detailLayout->addWidget(patientDetail);
+    form->addRow("Patient ID", patientId);
+    form->addRow("Full name", patientName);
+    form->addRow("Age", patientAge);
+    form->addRow("Contact", patientContact);
+    form->addRow("Category", patientCategory);
+    form->addRow("Category detail", detailRow);
+    drawerLayout->addLayout(form);
+    drawerLayout->addStretch();
+    auto* drawerActions = new QHBoxLayout();
+    auto* cancel = new QPushButton("Cancel", patientDrawer);
+    cancel->setObjectName("drawerCancelButton");
+    patientDrawerSubmit = new QPushButton("Register patient", patientDrawer);
+    patientDrawerSubmit->setObjectName("drawerPrimaryButton");
+    drawerActions->addStretch();
+    drawerActions->addWidget(cancel);
+    drawerActions->addWidget(patientDrawerSubmit);
+    drawerLayout->addLayout(drawerActions);
+    overlayLayout->addWidget(patientDrawer);
+    stack->addWidget(patientOverlay);
+
+    patientDrawerAnimation = new QPropertyAnimation(patientDrawer, "maximumWidth", this);
+    patientDrawerAnimation->setDuration(230);
+    patientDrawerAnimation->setEasingCurve(QEasingCurve::OutCubic);
+    connect(patientDrawerAnimation, &QPropertyAnimation::finished, this, [this]() {
+        if (closingPatientDrawer) {
+            patientOverlay->hide();
+            closingPatientDrawer = false;
+        }
+    });
+    connect(addPatient, &QPushButton::clicked, this, [this]() { openPatientDrawer(); });
+    connect(undo, &QPushButton::clicked, this, &MainWindow::onUndo);
+    connect(searchButton, &QPushButton::clicked, this, &MainWindow::onSearch);
+    connect(queryText, &QLineEdit::returnPressed, this, &MainWindow::onSearch);
+    connect(clearSearch, &QPushButton::clicked, this, [this]() {
+        queryText->clear();
+        refreshPatients();
+        statusBar()->showMessage("Showing all patient records.", 3000);
+    });
+    connect(sortButton, &QPushButton::clicked, this, &MainWindow::onSort);
+    connect(patientCategory, &QComboBox::currentTextChanged, this, &MainWindow::onCategoryChanged);
+    connect(patientDrawerSubmit, &QPushButton::clicked, this, &MainWindow::onPatientDrawerSubmit);
+    connect(cancel, &QPushButton::clicked, this, &MainWindow::closePatientDrawer);
+    connect(closeDrawer, &QPushButton::clicked, this, &MainWindow::closePatientDrawer);
+    connect(patientTable, &QTableWidget::cellDoubleClicked, this,
+            [this](int row, int column) { openPatientFromTable(patientTable, row, column); });
     onCategoryChanged(patientCategory->currentText());
     return page;
 }
@@ -696,23 +872,6 @@ QWidget* MainWindow::makeQueuePage() {
     return page;
 }
 
-QWidget* MainWindow::makeSearchPage() {
-    auto* page=new QWidget(this);auto* layout=new QVBoxLayout(page);
-    auto* heading=new QLabel("Search and sort patients",page);QFont f=heading->font();f.setPointSize(20);f.setBold(true);heading->setFont(f);layout->addWidget(heading);
-    auto* searchBox=new QGroupBox("Search records",page);auto* grid=new QGridLayout(searchBox);
-    queryText=new QLineEdit(searchBox);queryText->setPlaceholderText("Patient ID, name, or category");queryText->setToolTip("Search does not change the frequently accessed patient cache.");
-    queryMethod=new QComboBox(searchBox);queryMethod->addItems({"Linear by ID","Binary by ID","Recursive by name","Category"});
-    auto* search=new QPushButton("Search",searchBox);grid->addWidget(queryText,0,0,1,2);grid->addWidget(queryMethod,0,2);grid->addWidget(search,0,3);layout->addWidget(searchBox);
-    searchTable=makeTable({"Patient ID","Name","Age","Contact","Category","Category detail"},page);layout->addWidget(searchTable,1);
-    auto* sortBox=new QGroupBox("Sort patient records",page);auto* sort=new QHBoxLayout(sortBox);
-    sortAlgorithm=new QComboBox(sortBox);sortAlgorithm->addItems({"Insertion sort","Selection sort"});
-    sortField=new QComboBox(sortBox);sortField->addItems({"Patient name","Patient ID","Age","Next appointment"});
-    auto* sortButton=new QPushButton("Sort",sortBox);sort->addWidget(new QLabel("Algorithm",sortBox));sort->addWidget(sortAlgorithm);sort->addWidget(new QLabel("Sort by",sortBox));sort->addWidget(sortField);sort->addWidget(sortButton);layout->addWidget(sortBox);
-    connect(search,&QPushButton::clicked,this,&MainWindow::onSearch);connect(queryText,&QLineEdit::returnPressed,this,&MainWindow::onSearch);connect(sortButton,&QPushButton::clicked,this,&MainWindow::onSort);
-    connect(searchTable,&QTableWidget::cellDoubleClicked,this,[this](int r,int c){openPatientFromTable(searchTable,r,c);});
-    return page;
-}
-
 QWidget* MainWindow::makeReportsPage() {
     auto* page=new QWidget(this);auto* layout=new QVBoxLayout(page);
     auto* heading=new QLabel("Clinic reports",page);QFont f=heading->font();f.setPointSize(20);f.setBold(true);heading->setFont(f);layout->addWidget(heading);
@@ -736,20 +895,56 @@ void MainWindow::onCategoryChanged(const QString& category) {
 }
 
 void MainWindow::populatePatientTable(QTableWidget* table,const std::vector<const scapms::model::PatientRecord*>& patients) {
+    table->clearSpans();
     table->setRowCount(0);
     for(const auto* patient:patients){
         if(!patient)continue;const int row=table->rowCount();table->insertRow(row);
         auto* id=new QTableWidgetItem(q(patient->getPatientId()));id->setData(Qt::UserRole,q(patient->getPatientId()));table->setItem(row,0,id);
         table->setItem(row,1,new QTableWidgetItem(q(patient->getName())));table->setItem(row,2,new QTableWidgetItem(QString::number(patient->getAge())));table->setItem(row,3,new QTableWidgetItem(q(patient->getContact())));
         auto* category=new QTableWidgetItem(q(patient->category()));
-        if(patient->category()=="Emergency"){category->setForeground(QBrush(QColor("#b42318")));category->setBackground(QBrush(QColor("#fff0ed")));}
-        else if(patient->category()=="Follow-up"){category->setForeground(QBrush(QColor("#6941c6")));category->setBackground(QBrush(QColor("#f4f0ff")));}
-        else {category->setForeground(QBrush(QColor("#175cd3")));category->setBackground(QBrush(QColor("#eff8ff")));}
-        table->setItem(row,4,category);table->setItem(row,5,new QTableWidgetItem(q(patient->categoryDetail())));
+        const QString categoryName = q(patient->category());
+        const QColor categoryColor = categoryName == "Emergency" ? QColor("#c43228")
+                                   : categoryName == "Follow-up" ? QColor("#7651c7")
+                                                                 : QColor("#3265db");
+        const QString marker = categoryName == "Emergency" ? "emergency"
+                             : categoryName == "Follow-up" ? "follow-up" : "general";
+        category->setIcon(tableMarkerIcon(marker, categoryColor));
+        category->setForeground(QBrush(categoryColor));
+        table->setItem(row,4,category);
+        table->setItem(row,5,new QTableWidgetItem(q(patient->categoryDetail())));
+        table->setItem(row,6,new QTableWidgetItem(QString::number(patient->getAppointmentIds().size())));
+        auto* actions = new QPushButton("⋮", table);
+        actions->setObjectName("patientActionButton");
+        actions->setToolTip("Patient actions");
+        table->setCellWidget(row, 7, actions);
+        const QString patientIdValue = q(patient->getPatientId());
+        connect(actions, &QPushButton::clicked, this, [this, actions, patientIdValue]() {
+            QMenu menu(this);
+            menu.setStyleSheet("QMenu{background:#ffffff;border:1px solid #e4e9f0;padding:5px;}"
+                               "QMenu::item{padding:8px 24px 8px 8px;border-radius:5px;}"
+                               "QMenu::item:selected{background:#edf3ff;color:#3157a4;}");
+            QAction* editAction = menu.addAction(tableMarkerIcon("edit", QColor("#3157a4")), "Edit patient");
+            QAction* deleteAction = menu.addAction(tableMarkerIcon("delete", QColor("#b42318")), "Delete patient");
+            QAction* selected = menu.exec(actions->mapToGlobal(QPoint(0, actions->height())));
+            if (selected == editAction) {
+                openPatientDrawer(patientIdValue);
+            } else if (selected == deleteAction) {
+                patientId->setText(patientIdValue);
+                onDeletePatient();
+            }
+        });
+    }
+    if (patients.empty()) {
+        table->insertRow(0);
+        auto* empty = new QTableWidgetItem("No patient records match this view.");
+        empty->setTextAlignment(Qt::AlignCenter);
+        empty->setForeground(QBrush(QColor("#778397")));
+        table->setItem(0, 0, empty);
+        table->setSpan(0, 0, 1, table->columnCount());
     }
 }
 
-void MainWindow::refreshPatients(){std::vector<const scapms::model::PatientRecord*> patients;for(const auto& p:clinic.database().getPatients())patients.push_back(p.get());populatePatientTable(patientTable,patients);}
+void MainWindow::refreshPatients(){std::vector<const scapms::model::PatientRecord*> patients;for(const auto& p:clinic.database().getPatients())patients.push_back(p.get());populatePatientTable(patientTable,patients);if(patientsCountLabel)patientsCountLabel->setText(QString("%1 patient record%2").arg(patients.size()).arg(patients.size()==1?"":"s"));}
 
 void MainWindow::refreshAppointments(){
     appointmentTable->setRowCount(0);
@@ -848,10 +1043,73 @@ void MainWindow::refreshReports(){
 
 void MainWindow::refreshAll(){if(!patientTable)return;refreshPatients();refreshAppointments();refreshQueue();refreshDashboard();refreshReports();}
 
-void MainWindow::onPatientSelection(){if(patientTable->currentRow()<0)return;auto* cell=patientTable->item(patientTable->currentRow(),0);if(!cell)return;const auto*p=clinic.database().findPatient(s(cell->text()));if(!p)return;patientId->setText(q(p->getPatientId()));patientName->setText(q(p->getName()));patientAge->setValue(p->getAge());patientContact->setText(q(p->getContact()));patientCategory->setCurrentText(q(p->category()));patientDetail->setText(q(p->categoryDetail()));}
+void MainWindow::openPatientDrawer(const QString& id) {
+    if (!patientOverlay || !patientDrawer) return;
+    patientDrawerAnimation->stop();
+    closingPatientDrawer = false;
+    editingPatient = !id.isEmpty();
+    auto* title = patientDrawer->findChild<QLabel*>("patientDrawerTitle");
+    auto* hint = patientDrawer->findChild<QLabel*>("drawerHint");
+    if (editingPatient) {
+        const auto* patient = clinic.database().findPatient(s(id));
+        if (!patient) {
+            showClinicMessage(this, QMessageBox::Warning, "Patient not found", "That patient record is no longer available.");
+            return;
+        }
+        patientId->setText(q(patient->getPatientId()));
+        patientId->setReadOnly(true);
+        patientName->setText(q(patient->getName()));
+        patientAge->setValue(patient->getAge());
+        patientContact->setText(q(patient->getContact()));
+        patientCategory->setCurrentText(q(patient->category()));
+        QString detailValue = q(patient->categoryDetail());
+        if (patient->category() == "Emergency" && detailValue.startsWith("Priority "))
+            detailValue.remove(0, QString("Priority ").size());
+        patientDetail->setText(detailValue);
+        patientCategory->setEnabled(true);
+        patientDetail->setEnabled(true);
+        patientDrawerSubmit->setText("Save changes");
+        if (title) title->setText("Edit patient");
+        if (hint) hint->setText("Update the patient's information, then save your changes.");
+    } else {
+        patientId->clear();
+        patientId->setReadOnly(false);
+        patientName->clear();
+        patientAge->setValue(25);
+        patientContact->clear();
+        patientCategory->setCurrentIndex(0);
+        patientDetail->setText("1");
+        patientCategory->setEnabled(true);
+        patientDetail->setEnabled(true);
+        patientDrawerSubmit->setText("Register patient");
+        if (title) title->setText("Add patient");
+        if (hint) hint->setText("Enter the patient's details below. The ID is generated automatically if left blank.");
+    }
+    patientOverlay->show();
+    patientOverlay->raise();
+    patientDrawer->setMaximumWidth(0);
+    patientDrawerAnimation->setStartValue(0);
+    patientDrawerAnimation->setEndValue(440);
+    patientDrawerAnimation->start();
+    patientName->setFocus();
+}
 
-void MainWindow::onAddPatient(){try{QString id=patientId->text().trimmed();if(id.isEmpty())id=q(clinic.ids().nextAvailable("PT",[this](const std::string& candidate){return clinic.database().findPatient(candidate)!=nullptr;}));clinic.patients().add(clinic.database(),s(patientCategory->currentText()),s(id),patientName->text().trimmed().toUtf8().toStdString(),patientAge->value(),patientContact->text().trimmed().toUtf8().toStdString(),patientDetail->text().trimmed().toUtf8().toStdString());patientId->clear();patientName->clear();patientContact->clear();refreshAll();persistAfterChange("Patient " + id + " registered and saved.");}catch(const std::exception&e){showError(e);}}
-void MainWindow::onEditPatient(){try{if(patientId->text().trimmed().isEmpty())throw scapms::utils::ClinicException("Select a patient or enter a patient ID first.");clinic.patients().edit(clinic.database(),s(patientId->text().trimmed()),s(patientName->text().trimmed()),patientAge->value(),s(patientContact->text().trimmed()));refreshAll();persistAfterChange("Patient record updated and saved.");}catch(const std::exception&e){showError(e);}}
+void MainWindow::closePatientDrawer() {
+    if (!patientOverlay || !patientOverlay->isVisible()) return;
+    patientDrawerAnimation->stop();
+    closingPatientDrawer = true;
+    patientDrawerAnimation->setStartValue(patientDrawer->maximumWidth());
+    patientDrawerAnimation->setEndValue(0);
+    patientDrawerAnimation->start();
+}
+
+void MainWindow::onPatientDrawerSubmit() {
+    if (editingPatient) onEditPatient();
+    else onAddPatient();
+}
+
+void MainWindow::onAddPatient(){try{QString id=patientId->text().trimmed();if(id.isEmpty())id=q(clinic.ids().nextAvailable("PT",[this](const std::string& candidate){return clinic.database().findPatient(candidate)!=nullptr;}));clinic.patients().add(clinic.database(),s(patientCategory->currentText()),s(id),patientName->text().trimmed().toUtf8().toStdString(),patientAge->value(),patientContact->text().trimmed().toUtf8().toStdString(),patientDetail->text().trimmed().toUtf8().toStdString());refreshAll();closePatientDrawer();persistAfterChange("Patient " + id + " registered and saved.");}catch(const std::exception&e){showError(e);}}
+void MainWindow::onEditPatient(){try{if(patientId->text().trimmed().isEmpty())throw scapms::utils::ClinicException("Select a patient or enter a patient ID first.");clinic.patients().edit(clinic.database(),s(patientId->text().trimmed()),s(patientName->text().trimmed()),patientAge->value(),s(patientContact->text().trimmed()),s(patientCategory->currentText()),s(patientDetail->text().trimmed()));refreshAll();closePatientDrawer();persistAfterChange("Patient record updated and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onDeletePatient(){try{if(patientId->text().trimmed().isEmpty())throw scapms::utils::ClinicException("Select a patient record first.");const std::string id=s(patientId->text().trimmed());clinic.patients().remove(clinic.database(),clinic.waitingQueue(),id);refreshAll();persistAfterChange("Patient record deleted and saved. Use Undo to restore it.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onScheduleAppointment(){try{const std::string id=clinic.appointments().schedule(clinic.database(),s(appointmentPatientId->text().trimmed()),s(appointmentDateTime->dateTime().toString("yyyy-MM-dd HH:mm")),s(appointmentReason->text().trimmed()));appointmentReason->clear();refreshAll();persistAfterChange("Appointment " + q(id) + " scheduled and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onCancelAppointment(){try{const int r=appointmentTable->currentRow();if(r<0)throw scapms::utils::ClinicException("Select an appointment first.");clinic.appointments().cancel(clinic.database(),s(appointmentTable->item(r,0)->text()));refreshAll();persistAfterChange("Appointment cancelled and saved.");}catch(const std::exception&e){showError(e);}}
@@ -859,9 +1117,9 @@ void MainWindow::onCompleteAppointment(){try{const int r=appointmentTable->curre
 void MainWindow::onJoinQueue(){try{clinic.appointments().joinQueue(clinic.database(),clinic.waitingQueue(),s(queuePatientId->text().trimmed()));queuePatientId->clear();refreshAll();persistAfterChange("Patient added to the queue and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onCallNext(){const std::string id=clinic.appointments().callNext(clinic.waitingQueue());if(id.empty()){showClinicMessage(this,QMessageBox::Information,"Waiting queue","The waiting queue is empty.");return;}const auto*p=clinic.database().findPatient(id);refreshAll();persistAfterChange("Called the next patient and saved the queue.");showClinicMessage(this,QMessageBox::Information,"Call next patient",p?"Please call " + q(p->getName()) + " ("+q(id)+").":"Please call patient "+q(id)+".");}
 
-void MainWindow::onSearch(){const QString query=queryText->text().trimmed();if(query.isEmpty()){showClinicMessage(this,QMessageBox::Information,"Search","Enter an ID, name, or category.");return;}std::vector<const scapms::model::PatientRecord*> result;const auto method=queryMethod->currentText();if(method=="Linear by ID")result=clinic.search().linearId(clinic.database(),query.toUtf8().toStdString());else if(method=="Binary by ID")result=clinic.search().binaryId(clinic.database(),query.toUtf8().toStdString());else if(method=="Recursive by name")result=clinic.search().recursiveNameSearch(clinic.database(),query.toUtf8().toStdString());else result=clinic.search().categorySearch(clinic.database(),query.toUtf8().toStdString());populatePatientTable(searchTable,result);statusBar()->showMessage(QString("Found %1 patient record(s). Search does not count as opening a record.").arg(result.size()),6000);}
+void MainWindow::onSearch(){const QString query=queryText->text().trimmed();if(query.isEmpty()){showClinicMessage(this,QMessageBox::Information,"Search","Enter an ID, name, or category.");return;}std::vector<const scapms::model::PatientRecord*> result;const auto method=queryMethod->currentText();if(method=="Linear by ID")result=clinic.search().linearId(clinic.database(),query.toUtf8().toStdString());else if(method=="Binary by ID")result=clinic.search().binaryId(clinic.database(),query.toUtf8().toStdString());else if(method=="Recursive by name")result=clinic.search().recursiveNameSearch(clinic.database(),query.toUtf8().toStdString());else result=clinic.search().categorySearch(clinic.database(),query.toUtf8().toStdString());populatePatientTable(patientTable,result);statusBar()->showMessage(QString("Found %1 patient record(s). Search does not count as opening a record.").arg(result.size()),6000);}
 
-void MainWindow::onSort(){scapms::controller::SortField field=scapms::controller::SortField::Name;const QString by=sortField->currentText();if(by=="Patient ID")field=scapms::controller::SortField::PatientId;else if(by=="Age")field=scapms::controller::SortField::Age;else if(by=="Next appointment")field=scapms::controller::SortField::AppointmentDate;const auto algorithm=sortAlgorithm->currentText()=="Insertion sort"?scapms::controller::SortAlgorithm::Insertion:scapms::controller::SortAlgorithm::Selection;populatePatientTable(searchTable,clinic.search().sortedPatients(clinic.database(),field,algorithm));statusBar()->showMessage("Patient table sorted using a student-implemented algorithm.",4500);}
+void MainWindow::onSort(){scapms::controller::SortField field=scapms::controller::SortField::Name;const QString by=sortField->currentText();if(by=="Patient ID")field=scapms::controller::SortField::PatientId;else if(by=="Age")field=scapms::controller::SortField::Age;else if(by=="Next appointment")field=scapms::controller::SortField::AppointmentDate;const auto algorithm=sortAlgorithm->currentText()=="Insertion sort"?scapms::controller::SortAlgorithm::Insertion:scapms::controller::SortAlgorithm::Selection;populatePatientTable(patientTable,clinic.search().sortedPatients(clinic.database(),field,algorithm));statusBar()->showMessage("Patient records sorted using the selected algorithm.",4500);}
 
 void MainWindow::onUndo(){try{clinic.administration().undoLast(clinic.database(),clinic.waitingQueue(),clinic.history());refreshAll();persistAfterChange("Last administrative action undone and saved.");}catch(const std::exception&e){showError(e);}}
 

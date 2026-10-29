@@ -11,8 +11,10 @@
 
 class QComboBox;
 class QDateTimeEdit;
+class QFrame;
 class QLabel;
 class QLineEdit;
+class QPropertyAnimation;
 class QPushButton;
 class QSpinBox;
 class QStackedWidget;
@@ -30,7 +32,7 @@ private:
     QString dataPath;
     QString seedPath;
 
-    std::array<QPushButton*, 6> navigationButtons{};
+    std::array<QPushButton*, 5> navigationButtons{};
     QStackedWidget* pages = nullptr;
     QLineEdit* globalSearch = nullptr;
     QLabel* pageTitle = nullptr;
@@ -39,12 +41,12 @@ private:
     QLabel* waitingCountCard = nullptr;
     QLabel* dashboardDateLabel = nullptr;
     QLabel* dashboardWelcomeSummary = nullptr;
+    QLabel* patientsCountLabel = nullptr;
 
     QTableWidget* dashboardTable = nullptr;
     QTableWidget* patientTable = nullptr;
     QTableWidget* appointmentTable = nullptr;
     QTableWidget* queueTable = nullptr;
-    QTableWidget* searchTable = nullptr;
     QTableWidget* frequentTable = nullptr;
     QTableWidget* pendingTable = nullptr;
     QTableWidget* categoryTable = nullptr;
@@ -69,6 +71,13 @@ private:
     QComboBox* sortAlgorithm = nullptr;
     QComboBox* sortField = nullptr;
 
+    QWidget* patientOverlay = nullptr;
+    QFrame* patientDrawer = nullptr;
+    QPushButton* patientDrawerSubmit = nullptr;
+    QPropertyAnimation* patientDrawerAnimation = nullptr;
+    bool editingPatient = false;
+    bool closingPatientDrawer = false;
+
     QTimer* refreshTimer = nullptr;
     int lastReminderMinute = -1;
 
@@ -78,7 +87,6 @@ private:
     QWidget* makePatientsPage();
     QWidget* makeAppointmentsPage();
     QWidget* makeQueuePage();
-    QWidget* makeSearchPage();
     QWidget* makeReportsPage();
     QTableWidget* makeTable(const QStringList& headers, QWidget* parent);
     void loadStartupData();
@@ -91,10 +99,12 @@ private:
     void refreshAppointments();
     void refreshQueue();
     void refreshReports();
+    void openPatientDrawer(const QString& patientId = QString());
+    void closePatientDrawer();
     void populatePatientTable(QTableWidget* table,
                               const std::vector<const scapms::model::PatientRecord*>& patients);
-    void onPatientSelection();
     void onCategoryChanged(const QString& category);
+    void onPatientDrawerSubmit();
     void onAddPatient();
     void onEditPatient();
     void onDeletePatient();

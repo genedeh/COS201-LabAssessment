@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "../model/AdminActionHistory.h"
 #include "../model/ClinicDatabase.h"
@@ -21,24 +22,27 @@ private:
     static std::unique_ptr<model::PatientRecord> makePatient(
         const std::string& category, const std::string& id,
         const std::string& name, int age, const std::string& contact,
-        const std::string& detail = "") {
+        const std::string& detail = "",
+        std::vector<std::string> appointmentIds = {}) {
         if (id.empty() || name.empty() || contact.empty())
             throw utils::ClinicException("Patient ID, name, and contact are required.");
         if (age < 0 || age > 120)
             throw utils::ClinicException("Patient age must be between 0 and 120.");
         if (category == "General")
-            return std::make_unique<model::GeneralPatient>(id, name, age, contact);
+            return std::make_unique<model::GeneralPatient>(id, name, age, contact,
+                                                           std::move(appointmentIds));
         if (category == "Emergency") {
             int level = 1;
             try { if (!detail.empty()) level = std::stoi(detail); }
             catch (...) { throw utils::ClinicException("Emergency priority must be a number from 1 to 5."); }
             if (level < 1 || level > 5)
                 throw utils::ClinicException("Emergency priority must be from 1 to 5.");
-            return std::make_unique<model::EmergencyPatient>(id, name, age, contact, level);
+            return std::make_unique<model::EmergencyPatient>(id, name, age, contact, level,
+                                                             std::move(appointmentIds));
         }
         if (category == "Follow-up")
             return std::make_unique<model::FollowUpPatient>(id, name, age, contact,
-                detail.empty() ? "Follow-up visit" : detail);
+                detail.empty() ? "Follow-up visit" : detail, std::move(appointmentIds));
         throw utils::ClinicException("Choose a valid patient category.");
     }
 
@@ -56,7 +60,8 @@ public:
     }
 
     void edit(model::ClinicDatabase& database, const std::string& id,
-              const std::string& name, int age, const std::string& contact) {
+              const std::string& name, int age, const std::string& contact,
+              const std::string& category = "", const std::string& detail = "") {
         model::PatientRecord* patient = database.findPatient(id);
         if (!patient) throw utils::ClinicException("Patient not found.");
         if (name.empty() || contact.empty())
@@ -64,7 +69,12 @@ public:
         if (age < 0 || age > 120)
             throw utils::ClinicException("Patient age must be between 0 and 120.");
         auto before = patient->clone();
-        patient->updateCommonDetails(name, age, contact);
+        const std::string updatedCategory = category.empty() ? patient->category() : category;
+        const std::string updatedDetail = detail.empty() ? patient->categoryDetail() : detail;
+        auto updated = makePatient(updatedCategory, id, name, age, contact,
+                                   updatedDetail, patient->getAppointmentIds());
+        if (!database.replacePatient(std::move(updated)))
+            throw utils::ClinicException("The patient record could not be updated.");
         history.record(model::AdminAction(model::AdminAction::Kind::PatientEdited,
                                           id, std::move(before)));
     }
