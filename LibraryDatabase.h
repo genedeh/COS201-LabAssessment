@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -35,6 +36,25 @@ public:
         }
 
         return items[index].get();
+    }
+
+    // Look up by ID without transferring ownership from the database.
+    LibraryItem* findItemById(const std::string& id) {
+        for (const std::unique_ptr<LibraryItem>& item : items) {
+            if (item != nullptr && item->getId() == id) {
+                return item.get();
+            }
+        }
+        return nullptr;
+    }
+
+    const LibraryItem* findItemById(const std::string& id) const {
+        for (const std::unique_ptr<LibraryItem>& item : items) {
+            if (item != nullptr && item->getId() == id) {
+                return item.get();
+            }
+        }
+        return nullptr;
     }
 };
 

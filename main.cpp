@@ -6,11 +6,11 @@
 #include "AdminActionHistory.h"
 #include "Book.h"
 #include "BorrowingRecord.h"
+#include "controller/BorrowController.h"
 #include "controller/SearchEngine.h"
 #include "Journal.h"
 #include "LibraryDatabase.h"
 #include "Magazine.h"
-#include "ReservationQueue.h"
 #include "UserAccount.h"
 
 // This function accepts the common base type. The correct itemType()
@@ -51,14 +51,23 @@ int main() {
         std::cout << "Returned on: " << record.getReturnedOn().value() << "\n";
     }
 
-    ReservationQueue reservations;
-    reservations.addReservation("U002"); // Sam reserves first.
-    reservations.addReservation("U003"); // Alex reserves second.
-    const auto nextUserId = reservations.takeNextUser();
-    if (nextUserId.has_value()) {
-        std::cout << "Next user waiting: " << nextUserId.value() << "\n";
-    }
-    std::cout << "Users still waiting: " << reservations.getWaitingCount() << "\n";
+    BorrowController borrowController;
+    UserAccount sam("U002", "Sam");
+    UserAccount alex("U003", "Alex");
+
+    const BorrowResult samResult = borrowController.borrowItem(
+        database, sam, "B001", "2026-10-29");
+    const BorrowResult alexResult = borrowController.borrowItem(
+        database, alex, "B001", "2026-10-29");
+
+    std::cout << "Sam's borrow request: "
+              << (samResult == BorrowResult::Borrowed ? "borrowed" : "not borrowed")
+              << "\n";
+    std::cout << "Alex's request: "
+              << (alexResult == BorrowResult::Reserved ? "reserved" : "not reserved")
+              << "\n";
+    std::cout << "Users waiting for B001: "
+              << borrowController.getWaitingCount("B001") << "\n";
 
     AdminActionHistory adminHistory;
     adminHistory.recordAction({
