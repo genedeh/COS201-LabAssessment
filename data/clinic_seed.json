@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "patients": [
+    {"id":"PT0001","name":"Ada Okafor","age":29,"contact":"0803-555-0101","category":"General","detail":"Routine","appointmentIds":["AP0001"]},
+    {"id":"PT0002","name":"Samuel Bello","age":42,"contact":"0803-555-0102","category":"Follow-up","detail":"Blood pressure review","appointmentIds":["AP0002"]},
+    {"id":"PT0003","name":"Mariam Yusuf","age":35,"contact":"0803-555-0103","category":"Emergency","detail":"1","appointmentIds":[]},
+    {"id":"PT0004","name":"Chika Nwosu","age":21,"contact":"0803-555-0104","category":"General","detail":"Routine","appointmentIds":[]},
+    {"id":"PT0005","name":"David Mensah","age":56,"contact":"0803-555-0105","category":"Follow-up","detail":"Post-treatment review","appointmentIds":["AP0003"]},
+    {"id":"PT0006","name":"Zainab Musa","age":31,"contact":"0803-555-0106","category":"General","detail":"Routine","appointmentIds":[]},
+    {"id":"PT0007","name":"Peter Eze","age":67,"contact":"0803-555-0107","category":"Emergency","detail":"2","appointmentIds":[]},
+    {"id":"PT0008","name":"Grace Adebayo","age":24,"contact":"0803-555-0108","category":"General","detail":"Routine","appointmentIds":[]}
+  ],
+  "appointments": [
+    {"id":"AP0001","patientId":"PT0001","dateTime":"2026-10-29 09:00","reason":"Routine health check","status":"Pending"},
+    {"id":"AP0002","patientId":"PT0002","dateTime":"2026-10-29 10:30","reason":"Blood pressure follow-up","status":"Pending"},
+    {"id":"AP0003","patientId":"PT0005","dateTime":"2026-10-30 11:00","reason":"Post-treatment review","status":"Completed"}
+  ],
+  "waitingQueue": ["PT0003"]
+}
