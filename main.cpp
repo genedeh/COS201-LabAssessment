@@ -113,6 +113,23 @@ int main() {
     }
     std::cout << "\n";
 
+    const std::vector<const LibraryItem*> yearSortedItems =
+        searchEngine.makeSortedView(database, SortField::PublicationYear);
+    std::cout << "Items sorted by publication year: ";
+    for (const LibraryItem* item : yearSortedItems) {
+        std::cout << item->getPublicationYear() << " - "
+                  << item->getTitle() << " | ";
+    }
+    std::cout << "\n";
+
+    const std::vector<const LibraryItem*> authorSortedItems =
+        searchEngine.makeSortedView(database, SortField::Author);
+    std::cout << "Items sorted by author: ";
+    for (const LibraryItem* item : authorSortedItems) {
+        std::cout << item->itemType() << " - " << item->getTitle() << " | ";
+    }
+    std::cout << "\n";
+
     const LibraryItem* binaryFound =
         searchEngine.binarySearchByTitle(titleSortedItems, "SCIENCE MONTHLY");
     if (binaryFound != nullptr) {

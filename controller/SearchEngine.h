@@ -12,6 +12,12 @@
 #include "../ItemAccessCache.h"
 #include "../LibraryDatabase.h"
 
+enum class SortField {
+    Title,
+    Author,
+    PublicationYear
+};
+
 // Handles catalogue searches. It borrows the database and never owns items.
 class SearchEngine {
 private:
@@ -23,6 +29,37 @@ private:
                            return static_cast<char>(std::tolower(character));
                        });
         return text;
+    }
+
+    static bool comesBefore(const LibraryItem* left,
+                            const LibraryItem* right,
+                            SortField field) {
+        if (field == SortField::Title) {
+            return toLowercase(left->getTitle()) <
+                   toLowercase(right->getTitle());
+        }
+
+        if (field == SortField::PublicationYear) {
+            return left->getPublicationYear() < right->getPublicationYear();
+        }
+
+        const Book* leftBook = dynamic_cast<const Book*>(left);
+        const Book* rightBook = dynamic_cast<const Book*>(right);
+
+        // Books have authors; item types without authors follow the books.
+        if (leftBook != nullptr && rightBook == nullptr) {
+            return true;
+        }
+        if (leftBook == nullptr && rightBook != nullptr) {
+            return false;
+        }
+        if (leftBook != nullptr && rightBook != nullptr) {
+            return toLowercase(leftBook->getAuthor()) <
+                   toLowercase(rightBook->getAuthor());
+        }
+
+        // Keep items without authors in their existing order.
+        return false;
     }
 
     const LibraryItem* recursiveSearchByTitle(
@@ -106,8 +143,8 @@ public:
 
     // Makes a sorted view of item pointers with insertion sort. The database
     // keeps ownership and its original item order is not changed.
-    std::vector<const LibraryItem*> makeTitleSortedView(
-        const LibraryDatabase& database) const {
+    std::vector<const LibraryItem*> makeSortedView(
+        const LibraryDatabase& database, SortField field) const {
         std::vector<const LibraryItem*> sortedItems;
         sortedItems.reserve(database.getItemCount());
 
@@ -119,14 +156,13 @@ public:
         }
 
         // The left side (before index) is sorted. Hold the next item as the
-        // key, shift larger titles right, and place the key into the gap.
+        // key, shift items that should come later right, and place the key.
         for (std::size_t index = 1; index < sortedItems.size(); ++index) {
             const LibraryItem* keyItem = sortedItems[index];
-            const std::string keyTitle = toLowercase(keyItem->getTitle());
             std::size_t position = index;
 
             while (position > 0 &&
-                   toLowercase(sortedItems[position - 1]->getTitle()) > keyTitle) {
+                   comesBefore(keyItem, sortedItems[position - 1], field)) {
                 sortedItems[position] = sortedItems[position - 1];
                 --position;
             }
@@ -135,6 +171,11 @@ public:
         }
 
         return sortedItems;
+    }
+
+    std::vector<const LibraryItem*> makeTitleSortedView(
+        const LibraryDatabase& database) const {
+        return makeSortedView(database, SortField::Title);
     }
 
     // Binary search requires this pointer list to be sorted by title.
