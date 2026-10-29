@@ -160,6 +160,52 @@ QIcon sidebarIcon(int index, const QColor& color) {
     return QIcon(pixmap);
 }
 
+QIcon tableMarkerIcon(const QString& kind, const QColor& color) {
+    QPixmap pixmap(48, 48);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.scale(2.0, 2.0);
+    painter.setPen(QPen(color, 1.9, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+
+    if (kind == "pending") {
+        painter.drawEllipse(QRectF(4, 4, 16, 16));
+        painter.drawLine(QPointF(12, 7.5), QPointF(12, 12));
+        painter.drawLine(QPointF(12, 12), QPointF(15.5, 14));
+    } else if (kind == "completed") {
+        painter.drawEllipse(QRectF(4, 4, 16, 16));
+        QPainterPath check;
+        check.moveTo(8, 12); check.lineTo(10.8, 15); check.lineTo(16.5, 9);
+        painter.drawPath(check);
+    } else if (kind == "cancelled") {
+        painter.drawEllipse(QRectF(4, 4, 16, 16));
+        painter.drawLine(QPointF(9, 9), QPointF(15, 15));
+        painter.drawLine(QPointF(15, 9), QPointF(9, 15));
+    } else if (kind == "general") {
+        painter.drawEllipse(QRectF(9, 4, 6, 6));
+        QPainterPath person;
+        person.moveTo(4, 20); person.cubicTo(4, 15.5, 7, 13.5, 12, 13.5);
+        person.cubicTo(17, 13.5, 20, 15.5, 20, 20);
+        painter.drawPath(person);
+    } else if (kind == "follow-up") {
+        painter.drawRoundedRect(QRectF(4, 5, 16, 16), 2, 2);
+        painter.drawLine(QPointF(8, 3), QPointF(8, 7));
+        painter.drawLine(QPointF(16, 3), QPointF(16, 7));
+        painter.drawLine(QPointF(4, 9), QPointF(20, 9));
+        painter.drawLine(QPointF(8, 13), QPointF(10, 13));
+        painter.drawLine(QPointF(8, 16), QPointF(13, 16));
+    } else if (kind == "emergency") {
+        QPainterPath alert;
+        alert.moveTo(12, 3); alert.lineTo(21, 20); alert.lineTo(3, 20);
+        alert.closeSubpath();
+        painter.drawPath(alert);
+        painter.drawLine(QPointF(12, 9), QPointF(12, 14));
+        painter.drawPoint(QPointF(12, 17));
+    }
+    return QIcon(pixmap);
+}
+
 QFrame* makeStatCard(const QString& title, const QString& description,
                      QLabel*& value, int iconIndex, QWidget* parent) {
     auto* frame = new QFrame(parent);
@@ -546,6 +592,7 @@ QWidget* MainWindow::makeDashboardPage() {
     bannerStack->setAlignment(dashboardIllustration, Qt::AlignRight | Qt::AlignTop);
     layout->addWidget(bannerContainer);
 
+    layout->addSpacing(12);
     auto* cards = new QHBoxLayout();
     cards->setSpacing(14);
     cards->addWidget(makeStatCard("Registered patients", "Across all care categories",
@@ -739,18 +786,35 @@ void MainWindow::refreshDashboard(){
         dashboardTable->setItem(row, 0, new QTableWidgetItem(q(appointment->getDateTime()).mid(11)));
         dashboardTable->setItem(row, 1, new QTableWidgetItem(
             patient ? q(patient->getName()) : q(appointment->getPatientId())));
-        dashboardTable->setItem(row, 2, new QTableWidgetItem(patient ? q(patient->category()) : ""));
+        auto* category = new QTableWidgetItem(patient ? q(patient->category()) : "");
+        if (patient) {
+            const QString categoryName = q(patient->category());
+            const QString iconKind = categoryName == "Emergency" ? "emergency"
+                                   : categoryName == "Follow-up" ? "follow-up" : "general";
+            const QColor categoryColor = categoryName == "Emergency" ? QColor("#c43228")
+                                       : categoryName == "Follow-up" ? QColor("#7651c7")
+                                                                     : QColor("#3265db");
+            category->setIcon(tableMarkerIcon(iconKind, categoryColor));
+            category->setForeground(QBrush(categoryColor));
+        }
+        dashboardTable->setItem(row, 2, category);
         dashboardTable->setItem(row, 3, new QTableWidgetItem(q(appointment->getReason())));
 
         auto* status = new QTableWidgetItem(q(scapms::model::appointmentStatusName(appointment->getStatus())));
-        status->setTextAlignment(Qt::AlignCenter);
         if (appointment->getStatus() == scapms::model::AppointmentStatus::Pending) {
-            status->setForeground(QBrush(QColor("#067647")));
+            const QColor color("#b54708");
+            status->setIcon(tableMarkerIcon("pending", color));
+            status->setForeground(QBrush(color));
         } else if (appointment->getStatus() == scapms::model::AppointmentStatus::Completed) {
-            status->setForeground(QBrush(QColor("#475467")));
+            const QColor color("#067647");
+            status->setIcon(tableMarkerIcon("completed", color));
+            status->setForeground(QBrush(color));
         } else {
-            status->setForeground(QBrush(QColor("#b42318")));
+            const QColor color("#b42318");
+            status->setIcon(tableMarkerIcon("cancelled", color));
+            status->setForeground(QBrush(color));
         }
+        status->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         dashboardTable->setItem(row, 4, status);
     }
     if (todaysAppointments.empty()) {
