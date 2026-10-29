@@ -113,6 +113,14 @@ int main() {
     }
     std::cout << "\n";
 
+    const std::vector<const LibraryItem*> selectionSortedTitles =
+        searchEngine.makeSelectionSortedView(database, SortField::Title);
+    std::cout << "Titles sorted with selection sort: ";
+    for (const LibraryItem* item : selectionSortedTitles) {
+        std::cout << item->getTitle() << " | ";
+    }
+    std::cout << "\n";
+
     const std::vector<const LibraryItem*> yearSortedItems =
         searchEngine.makeSortedView(database, SortField::PublicationYear);
     std::cout << "Items sorted by publication year: ";

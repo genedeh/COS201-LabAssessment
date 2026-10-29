@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "../Book.h"
@@ -176,6 +177,40 @@ public:
     std::vector<const LibraryItem*> makeTitleSortedView(
         const LibraryDatabase& database) const {
         return makeSortedView(database, SortField::Title);
+    }
+
+    // Selection sort: repeatedly select the item that belongs next and swap
+    // it into the first position of the remaining unsorted section.
+    std::vector<const LibraryItem*> makeSelectionSortedView(
+        const LibraryDatabase& database, SortField field) const {
+        std::vector<const LibraryItem*> sortedItems;
+        sortedItems.reserve(database.getItemCount());
+
+        for (std::size_t index = 0; index < database.getItemCount(); ++index) {
+            const LibraryItem* item = database.getItemAt(index);
+            if (item != nullptr) {
+                sortedItems.push_back(item);
+            }
+        }
+
+        for (std::size_t start = 0; start + 1 < sortedItems.size(); ++start) {
+            std::size_t smallestIndex = start;
+
+            for (std::size_t index = start + 1;
+                 index < sortedItems.size();
+                 ++index) {
+                if (comesBefore(sortedItems[index],
+                                sortedItems[smallestIndex], field)) {
+                    smallestIndex = index;
+                }
+            }
+
+            if (smallestIndex != start) {
+                std::swap(sortedItems[start], sortedItems[smallestIndex]);
+            }
+        }
+
+        return sortedItems;
     }
 
     // Binary search requires this pointer list to be sorted by title.
