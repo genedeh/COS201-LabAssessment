@@ -34,6 +34,7 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTimer>
+#include <QToolBar>
 #include <QVBoxLayout>
 #include <QStringList>
 
@@ -155,7 +156,11 @@ bool MainWindow::saveData(const QString& path, bool notify) {
                           "The clinic data could not be saved to " + path + ".\n" + error);
         return false;
     }
-    if (notify) statusBar()->showMessage("Clinic records saved to " + path, 5000);
+    if (notify) {
+        statusBar()->showMessage("Clinic records saved to " + path, 5000);
+        showClinicMessage(this, QMessageBox::Information, "Clinic data saved",
+                          "Clinic records were saved successfully to:\n" + path);
+    }
     return true;
 }
 
@@ -171,13 +176,11 @@ void MainWindow::persistAfterChange(const QString& successMessage) {
 
 void MainWindow::buildUi() {
     auto* fileMenu = menuBar()->addMenu("&File");
-    QAction* save = fileMenu->addAction("&Save");
+    QAction* save = fileMenu->addAction("&Save (Ctrl+S)");
     QAction* load = fileMenu->addAction("&Load JSON...");
     QAction* exportData = fileMenu->addAction("Save &As JSON...");
     fileMenu->addSeparator();
-    QAction* exit = fileMenu->addAction("E&xit");
-    save->setShortcut(QKeySequence::Save);
-    exit->setShortcut(QKeySequence::Quit);
+    QAction* exit = fileMenu->addAction("E&xit (Ctrl+Q)");
     connect(save, &QAction::triggered, this, [this]() { saveData(dataPath, true); });
     connect(load, &QAction::triggered, this, [this]() {
         const QString path = QFileDialog::getOpenFileName(this, "Load clinic records", QDir::homePath(), "JSON files (*.json)");
@@ -188,6 +191,23 @@ void MainWindow::buildUi() {
         if (!path.isEmpty()) saveData(path, true);
     });
     connect(exit, &QAction::triggered, this, &QWidget::close);
+
+    // Put file actions in the visible window as well as the File menu so
+    // users can find JSON load/save without knowing the menu location.
+    auto* fileToolbar = addToolBar("File");
+    fileToolbar->setMovable(false);
+    fileToolbar->addAction(load);
+    fileToolbar->addAction(save);
+    fileToolbar->addAction(exportData);
+
+    // Use explicit application-wide bindings because QKeySequence::Quit is
+    // platform dependent and may not map to Ctrl+Q on Windows.
+    auto* saveShortcut = new QShortcut(QKeySequence("Ctrl+S"), this);
+    saveShortcut->setContext(Qt::ApplicationShortcut);
+    connect(saveShortcut, &QShortcut::activated, this, [this]() { saveData(dataPath, true); });
+    auto* quitShortcut = new QShortcut(QKeySequence("Ctrl+Q"), this);
+    quitShortcut->setContext(Qt::ApplicationShortcut);
+    connect(quitShortcut, &QShortcut::activated, this, &QWidget::close);
 
     auto* root = new QWidget(this);
     auto* rootLayout = new QHBoxLayout(root);
