@@ -34,10 +34,16 @@ public:
                 throw utils::ClinicException("This patient already has a pending appointment at that time.");
         }
 
-        const std::string id = ids.next("AP");
+        const std::string id = ids.nextAvailable("AP", [&database](const std::string& candidate) {
+            return database.findAppointment(candidate) != nullptr;
+        });
         model::Appointment appointment(id, patientId, dateTime, reason);
-        if (!patient->scheduleAppointment(id) || !database.addAppointment(appointment))
-            throw utils::ClinicException("The appointment could not be scheduled.");
+        if (!patient->scheduleAppointment(id))
+            throw utils::ClinicException("This appointment ID is already linked to the patient.");
+        if (!database.addAppointment(appointment)) {
+            patient->cancelAppointment(id);
+            throw utils::ClinicException("The appointment ID is already in use.");
+        }
         history.record(model::AdminAction(model::AdminAction::Kind::AppointmentScheduled, id));
         return id;
     }

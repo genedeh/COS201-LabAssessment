@@ -44,7 +44,10 @@ public:
             item.insert("age", patient->getAge());
             item.insert("contact", qstr(patient->getContact()));
             item.insert("category", qstr(patient->category()));
-            item.insert("detail", qstr(patient->categoryDetail()));
+            QString detail = qstr(patient->categoryDetail());
+            if (const auto* emergency = dynamic_cast<const model::EmergencyPatient*>(patient.get()))
+                detail = QString::number(emergency->getPriorityLevel());
+            item.insert("detail", detail);
             QJsonArray appointmentIds;
             for (const auto& id : patient->getAppointmentIds()) appointmentIds.append(qstr(id));
             item.insert("appointmentIds", appointmentIds);
@@ -105,22 +108,18 @@ public:
             if (id.empty() || name.empty() || contact.empty() || age < 0 || age > 120) {
                 error = "Patient entry has missing or invalid identity details."; return false;
             }
-            if (!item.value("appointmentIds").isArray()) {
-                error = "Patient appointment links are missing or invalid."; return false;
-            }
             std::unique_ptr<model::PatientRecord> patient;
             if (category == "General") patient = std::make_unique<model::GeneralPatient>(id,name,age,contact);
             else if (category == "Emergency") {
-                bool ok = false; const int level = QString::fromStdString(detail).toInt(&ok);
+                QString priority = QString::fromStdString(detail).trimmed();
+                // Earlier saved files stored the display label, such as "Priority 1".
+                if (priority.startsWith("Priority", Qt::CaseInsensitive))
+                    priority = priority.mid(QString("Priority").size()).trimmed();
+                bool ok = false; const int level = priority.toInt(&ok);
                 if (!ok || level < 1 || level > 5) { error = "Invalid emergency priority."; return false; }
                 patient = std::make_unique<model::EmergencyPatient>(id,name,age,contact,level);
             } else if (category == "Follow-up") patient = std::make_unique<model::FollowUpPatient>(id,name,age,contact,detail);
             else { error = "Unknown patient category."; return false; }
-            for (const auto& ref : item.value("appointmentIds").toArray()) {
-                if (!ref.isString() || !patient->scheduleAppointment(text(ref))) {
-                    error = "Patient has an invalid or duplicate appointment link."; return false;
-                }
-            }
             if (!loaded.addPatient(std::move(patient))) { error = "Duplicate patient ID: " + QString::fromStdString(id); return false; }
         }
 
@@ -144,25 +143,12 @@ public:
                 error = "Duplicate appointment ID: " + QString::fromStdString(id); return false;
             }
         }
-        // Cross-check both sides of each patient/appointment relationship.
-        for (const auto& patient : loaded.getPatients()) {
-            for (const auto& appointmentId : patient->getAppointmentIds()) {
-                const auto* appointment = loaded.findAppointment(appointmentId);
-                if (!appointment || appointment->getPatientId() != patient->getPatientId() ||
-                    appointment->getStatus() == model::AppointmentStatus::Cancelled) {
-                    error = "Patient record contains an invalid appointment link."; return false;
-                }
-            }
-        }
+        // Appointment records are authoritative. Rebuild the patient-side links
+        // so legacy saves with stale or misassigned IDs can still be recovered.
         for (const auto& appointment : loaded.getAppointments()) {
-            const auto* patient = loaded.findPatient(appointment.getPatientId());
-            const auto& links = patient->getAppointmentIds();
-            bool linked = false;
-            for (const auto& link : links) if (link == appointment.getId()) linked = true;
-            if ((appointment.getStatus() == model::AppointmentStatus::Cancelled && linked) ||
-                (appointment.getStatus() != model::AppointmentStatus::Cancelled && !linked)) {
-                error = "Appointment and patient records do not have matching links."; return false;
-            }
+            auto* patient = loaded.findPatient(appointment.getPatientId());
+            if (appointment.getStatus() != model::AppointmentStatus::Cancelled)
+                patient->scheduleAppointment(appointment.getId());
         }
         std::unordered_set<std::string> queuedPatients;
         for (const auto& value : root.value("waitingQueue").toArray()) {

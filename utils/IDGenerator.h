@@ -19,6 +19,15 @@ public:
         out << prefix << std::setw(4) << std::setfill('0') << value++;
         return out.str();
     }
+
+    template <typename IsTaken>
+    std::string nextAvailable(const std::string& prefix, IsTaken isTaken) {
+        std::string candidate;
+        do {
+            candidate = next(prefix);
+        } while (isTaken(candidate));
+        return candidate;
+    }
 };
 
 } // namespace scapms::utils

@@ -64,6 +64,18 @@ QLabel* cardValue(const QString& value, QWidget* parent) {
     return label;
 }
 
+void showClinicMessage(QWidget* parent, QMessageBox::Icon icon,
+                       const QString& title, const QString& message) {
+    QMessageBox dialog(icon, title, message, QMessageBox::Ok, parent);
+    dialog.setStyleSheet(
+        "QMessageBox{background:#202124;}"
+        "QMessageBox QLabel{color:#ffffff;}"
+        "QMessageBox QPushButton{color:#ffffff;background:#3157a4;"
+        "border:0;border-radius:5px;padding:7px 18px;}"
+        "QMessageBox QPushButton:hover{background:#27488b;}");
+    dialog.exec();
+}
+
 QFrame* makeStatCard(const QString& title, QLabel*& value, QWidget* parent) {
     auto* frame = new QFrame(parent);
     frame->setObjectName("statCard");
@@ -115,17 +127,18 @@ void MainWindow::loadStartupData() {
         scapms::utils::FileHandler::load(dataPath, clinic.database(), clinic.waitingQueue(), error))
         return;
     if (QFile::exists(dataPath))
-        QMessageBox::warning(this, "Saved data could not be loaded",
-                             error + "\nThe supplied sample records will be loaded.");
+        showClinicMessage(this, QMessageBox::Warning, "Saved data could not be loaded",
+                          error + "\nThe supplied sample records will be loaded.");
     error.clear();
     if (!scapms::utils::FileHandler::load(seedPath, clinic.database(), clinic.waitingQueue(), error))
-        QMessageBox::critical(this, "Sample data could not be loaded", error + "\n" + seedPath);
+        showClinicMessage(this, QMessageBox::Critical, "Sample data could not be loaded",
+                          error + "\n" + seedPath);
 }
 
 bool MainWindow::loadData(const QString& path, bool notify) {
     QString error;
     if (!scapms::utils::FileHandler::load(path, clinic.database(), clinic.waitingQueue(), error)) {
-        if (notify) QMessageBox::warning(this, "Load failed", error);
+        if (notify) showClinicMessage(this, QMessageBox::Warning, "Load failed", error);
         return false;
     }
     clinic.clearHistory();
@@ -138,7 +151,7 @@ bool MainWindow::loadData(const QString& path, bool notify) {
 bool MainWindow::saveData(const QString& path, bool notify) {
     QString error;
     if (!scapms::utils::FileHandler::save(path, clinic.database(), clinic.waitingQueue(), error)) {
-        if (notify) QMessageBox::warning(this, "Save failed", error);
+        if (notify) showClinicMessage(this, QMessageBox::Warning, "Save failed", error);
         return false;
     }
     if (notify) statusBar()->showMessage("Clinic records saved to " + path, 5000);
@@ -397,21 +410,21 @@ void MainWindow::refreshAll(){if(!patientTable)return;refreshPatients();refreshA
 
 void MainWindow::onPatientSelection(){if(patientTable->currentRow()<0)return;auto* cell=patientTable->item(patientTable->currentRow(),0);if(!cell)return;const auto*p=clinic.database().findPatient(s(cell->text()));if(!p)return;patientId->setText(q(p->getPatientId()));patientName->setText(q(p->getName()));patientAge->setValue(p->getAge());patientContact->setText(q(p->getContact()));patientCategory->setCurrentText(q(p->category()));patientDetail->setText(q(p->categoryDetail()));}
 
-void MainWindow::onAddPatient(){try{QString id=patientId->text().trimmed();if(id.isEmpty())id=q(clinic.ids().next("PT"));clinic.patients().add(clinic.database(),s(patientCategory->currentText()),s(id),s(patientName->text().trimmed()),patientAge->value(),s(patientContact->text().trimmed()),s(patientDetail->text().trimmed()));patientId->clear();patientName->clear();patientContact->clear();refreshAll();saveData(dataPath,false);statusBar()->showMessage("Patient " + id + " registered.",5000);}catch(const std::exception&e){showError(e);}}
+void MainWindow::onAddPatient(){try{QString id=patientId->text().trimmed();if(id.isEmpty())id=q(clinic.ids().nextAvailable("PT",[this](const std::string& candidate){return clinic.database().findPatient(candidate)!=nullptr;}));clinic.patients().add(clinic.database(),s(patientCategory->currentText()),s(id),patientName->text().trimmed().toUtf8().toStdString(),patientAge->value(),patientContact->text().trimmed().toUtf8().toStdString(),patientDetail->text().trimmed().toUtf8().toStdString());patientId->clear();patientName->clear();patientContact->clear();refreshAll();saveData(dataPath,false);statusBar()->showMessage("Patient " + id + " registered.",5000);}catch(const std::exception&e){showError(e);}}
 void MainWindow::onEditPatient(){try{if(patientId->text().trimmed().isEmpty())throw scapms::utils::ClinicException("Select a patient or enter a patient ID first.");clinic.patients().edit(clinic.database(),s(patientId->text().trimmed()),s(patientName->text().trimmed()),patientAge->value(),s(patientContact->text().trimmed()));refreshAll();saveData(dataPath,false);statusBar()->showMessage("Patient record updated.",4000);}catch(const std::exception&e){showError(e);}}
 void MainWindow::onDeletePatient(){try{if(patientId->text().trimmed().isEmpty())throw scapms::utils::ClinicException("Select a patient record first.");const std::string id=s(patientId->text().trimmed());clinic.patients().remove(clinic.database(),clinic.waitingQueue(),id);refreshAll();saveData(dataPath,false);statusBar()->showMessage("Patient record deleted. Use Undo to restore it.",5000);}catch(const std::exception&e){showError(e);}}
 void MainWindow::onScheduleAppointment(){try{const std::string id=clinic.appointments().schedule(clinic.database(),s(appointmentPatientId->text().trimmed()),s(appointmentDateTime->dateTime().toString("yyyy-MM-dd HH:mm")),s(appointmentReason->text().trimmed()));appointmentReason->clear();refreshAll();saveData(dataPath,false);statusBar()->showMessage("Appointment " + q(id) + " scheduled.",5000);}catch(const std::exception&e){showError(e);}}
 void MainWindow::onCancelAppointment(){try{const int r=appointmentTable->currentRow();if(r<0)throw scapms::utils::ClinicException("Select an appointment first.");clinic.appointments().cancel(clinic.database(),s(appointmentTable->item(r,0)->text()));refreshAll();saveData(dataPath,false);}catch(const std::exception&e){showError(e);}}
 void MainWindow::onCompleteAppointment(){try{const int r=appointmentTable->currentRow();if(r<0)throw scapms::utils::ClinicException("Select an appointment first.");clinic.appointments().complete(clinic.database(),s(appointmentTable->item(r,0)->text()));refreshAll();saveData(dataPath,false);}catch(const std::exception&e){showError(e);}}
 void MainWindow::onJoinQueue(){try{clinic.appointments().joinQueue(clinic.database(),clinic.waitingQueue(),s(queuePatientId->text().trimmed()));queuePatientId->clear();refreshAll();saveData(dataPath,false);statusBar()->showMessage("Patient added to the end of the waiting queue.",4000);}catch(const std::exception&e){showError(e);}}
-void MainWindow::onCallNext(){const std::string id=clinic.waitingQueue().callNext();if(id.empty()){QMessageBox::information(this,"Waiting queue","The waiting queue is empty.");return;}const auto*p=clinic.database().findPatient(id);refreshAll();saveData(dataPath,false);QMessageBox::information(this,"Call next patient",p?"Please call " + q(p->getName()) + " ("+q(id)+").":"Please call patient "+q(id)+".");}
+void MainWindow::onCallNext(){const std::string id=clinic.waitingQueue().callNext();if(id.empty()){showClinicMessage(this,QMessageBox::Information,"Waiting queue","The waiting queue is empty.");return;}const auto*p=clinic.database().findPatient(id);refreshAll();saveData(dataPath,false);showClinicMessage(this,QMessageBox::Information,"Call next patient",p?"Please call " + q(p->getName()) + " ("+q(id)+").":"Please call patient "+q(id)+".");}
 
-void MainWindow::onSearch(){const QString query=queryText->text().trimmed();if(query.isEmpty()){QMessageBox::information(this,"Search","Enter an ID, name, or category.");return;}std::vector<const scapms::model::PatientRecord*> result;const auto method=queryMethod->currentText();if(method=="Linear by ID")result=clinic.search().linearId(clinic.database(),s(query));else if(method=="Binary by ID")result=clinic.search().binaryId(clinic.database(),s(query));else if(method=="Recursive by name")result=clinic.search().recursiveNameSearch(clinic.database(),s(query));else result=clinic.search().categorySearch(clinic.database(),s(query));populatePatientTable(searchTable,result);statusBar()->showMessage(QString("Found %1 patient record(s). Search does not count as opening a record.").arg(result.size()),6000);}
+void MainWindow::onSearch(){const QString query=queryText->text().trimmed();if(query.isEmpty()){showClinicMessage(this,QMessageBox::Information,"Search","Enter an ID, name, or category.");return;}std::vector<const scapms::model::PatientRecord*> result;const auto method=queryMethod->currentText();if(method=="Linear by ID")result=clinic.search().linearId(clinic.database(),query.toUtf8().toStdString());else if(method=="Binary by ID")result=clinic.search().binaryId(clinic.database(),query.toUtf8().toStdString());else if(method=="Recursive by name")result=clinic.search().recursiveNameSearch(clinic.database(),query.toUtf8().toStdString());else result=clinic.search().categorySearch(clinic.database(),query.toUtf8().toStdString());populatePatientTable(searchTable,result);statusBar()->showMessage(QString("Found %1 patient record(s). Search does not count as opening a record.").arg(result.size()),6000);}
 
 void MainWindow::onSort(){scapms::controller::SortField field=scapms::controller::SortField::Name;const QString by=sortField->currentText();if(by=="Patient ID")field=scapms::controller::SortField::PatientId;else if(by=="Age")field=scapms::controller::SortField::Age;else if(by=="Next appointment")field=scapms::controller::SortField::AppointmentDate;const auto algorithm=sortAlgorithm->currentText()=="Insertion sort"?scapms::controller::SortAlgorithm::Insertion:scapms::controller::SortAlgorithm::Selection;populatePatientTable(searchTable,clinic.search().sortedPatients(clinic.database(),field,algorithm));statusBar()->showMessage("Patient table sorted using a student-implemented algorithm.",4500);}
 
 void MainWindow::onUndo(){try{clinic.administration().undoLast(clinic.database(),clinic.waitingQueue(),clinic.history());refreshAll();saveData(dataPath,false);statusBar()->showMessage("Last administrative action undone.",4500);}catch(const std::exception&e){showError(e);}}
 
-void MainWindow::openPatientFromTable(QTableWidget* table,int row,int){if(row<0||!table->item(row,0))return;const auto*p=clinic.database().findPatient(s(table->item(row,0)->text()));if(!p)return;clinic.accessCache().record(p->getPatientId());refreshReports();QMessageBox::information(this,"Patient record opened",q(p->getName())+"\n"+q(p->category())+"\nPatient ID: "+q(p->getPatientId()));}
+void MainWindow::openPatientFromTable(QTableWidget* table,int row,int){if(row<0||!table->item(row,0))return;const auto*p=clinic.database().findPatient(s(table->item(row,0)->text()));if(!p)return;clinic.accessCache().record(p->getPatientId());refreshReports();showClinicMessage(this,QMessageBox::Information,"Patient record opened",q(p->getName())+"\n"+q(p->category())+"\nPatient ID: "+q(p->getPatientId()));}
 
-void MainWindow::showError(const std::exception& error){QMessageBox::warning(this,"Clinic action could not be completed",QString::fromUtf8(error.what()));}
+void MainWindow::showError(const std::exception& error){showClinicMessage(this,QMessageBox::Warning,"Clinic action could not be completed",QString::fromUtf8(error.what()));}

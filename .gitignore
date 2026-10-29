@@ -3,6 +3,7 @@
 /build-verify/
 /build-scapms/
 /build-final/
+/build-hotfix/
 /builddeps/
 clinic_data.json
 *.exe
