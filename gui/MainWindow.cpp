@@ -491,6 +491,8 @@ void MainWindow::buildUi() {
         "#patientDrawer{background:#ffffff;border-left:1px solid #e2e8f0;}"
         "#patientOverlay{background:rgba(25,35,60,105);}"
         "#patientDrawerTitle{font-size:18px;font-weight:700;color:#253247;}"
+        "QPushButton#closePatientDrawerButton{background:#f7f9fc;color:#53627a;border:1px solid #e2e8f0;border-radius:8px;padding:0;font-size:22px;font-weight:400;}"
+        "QPushButton#closePatientDrawerButton:hover{background:#edf3ff;color:#3157a4;border-color:#d4e1fb;}"
         "#drawerHint{color:#778397;font-size:11px;}"
         "QPushButton#addPatientButton{background:#3157a4;color:#ffffff;border:0;border-radius:7px;padding:10px 15px;font-weight:600;}"
         "QPushButton#addPatientButton:hover{background:#27488b;}"
@@ -507,7 +509,14 @@ void MainWindow::buildUi() {
         "QTableWidget#dashboardAppointmentsTable{background:#ffffff;alternate-background-color:#f8faff;border:0;gridline-color:transparent;selection-background-color:#f0f5ff;outline:0;}"
         "QTableWidget#dashboardAppointmentsTable::item{border:0;padding:10px 9px;color:#344054;}"
         "QTableWidget#dashboardAppointmentsTable QHeaderView::section{background:#ffffff;color:#667085;border:0;border-bottom:1px solid #e6ebf2;padding:11px 9px;font-weight:600;}"
-        "#mutedText{color:#778397;} QLineEdit,QComboBox,QSpinBox,QDateTimeEdit{color:#253247;padding:7px;border:1px solid #d8dee8;border-radius:5px;background:white;}"
+        "#mutedText{color:#778397;} QLineEdit,QComboBox,QSpinBox,QDateTimeEdit{color:#253247;padding:8px 10px;border:1px solid #d8dee8;border-radius:7px;background:#ffffff;}"
+        "QComboBox::drop-down{width:27px;border:0;border-left:0;background:transparent;}"
+        "QComboBox::down-arrow{width:9px;height:9px;}"
+        "QComboBox QAbstractItemView{background:#ffffff;color:#253247;border:1px solid #e1e7ef;selection-background-color:#edf3ff;selection-color:#3157a4;outline:0;padding:4px;}"
+        "QSpinBox::up-button,QSpinBox::down-button{width:22px;border:0;background:transparent;}"
+        "QSpinBox::up-button{subcontrol-origin:border;subcontrol-position:top right;border-top-right-radius:6px;}"
+        "QSpinBox::down-button{subcontrol-origin:border;subcontrol-position:bottom right;border-bottom-right-radius:6px;}"
+        "QDateTimeEdit::drop-down{width:25px;border:0;background:transparent;}"
         "QPushButton{padding:8px 13px;background:#3157a4;color:white;border:0;border-radius:5px;}"
         "QPushButton:hover{background:#27488b;} QTableWidget{color:#253247;background:white;border:1px solid #e2e7ef;gridline-color:#edf0f5;} QTableWidget::item{color:#253247;}"
         "QHeaderView::section{background:#f4f6fa;color:#657186;padding:8px;border:0;font-weight:600;}"
@@ -713,14 +722,16 @@ QWidget* MainWindow::makePatientsPage() {
     searchRow->addWidget(searchButton);
     searchRow->addWidget(clearSearch);
     auto* sortRow = new QHBoxLayout();
-    auto* sortLabel = new QLabel("Sort records", controls);
+    auto* algorithmLabel = new QLabel("Algorithm", controls);
     sortAlgorithm = new QComboBox(controls);
     sortAlgorithm->addItems({"Insertion sort", "Selection sort"});
+    auto* sortByLabel = new QLabel("Sort by", controls);
     sortField = new QComboBox(controls);
     sortField->addItems({"Patient name", "Patient ID", "Age", "Next appointment"});
     auto* sortButton = new QPushButton("Apply sort", controls);
-    sortRow->addWidget(sortLabel);
+    sortRow->addWidget(algorithmLabel);
     sortRow->addWidget(sortAlgorithm);
+    sortRow->addWidget(sortByLabel);
     sortRow->addWidget(sortField, 1);
     sortRow->addWidget(sortButton);
     controlsLayout->addLayout(searchRow);
@@ -759,8 +770,9 @@ QWidget* MainWindow::makePatientsPage() {
     auto* drawerHeading = new QLabel("Add patient", patientDrawer);
     drawerHeading->setObjectName("patientDrawerTitle");
     auto* closeDrawer = new QPushButton("×", patientDrawer);
-    closeDrawer->setObjectName("drawerCancelButton");
-    closeDrawer->setFixedSize(34, 34);
+    closeDrawer->setObjectName("closePatientDrawerButton");
+    closeDrawer->setFixedSize(38, 38);
+    closeDrawer->setToolTip("Close patient form");
     drawerHeadingRow->addWidget(drawerHeading);
     drawerHeadingRow->addStretch();
     drawerHeadingRow->addWidget(closeDrawer);
@@ -838,8 +850,10 @@ QWidget* MainWindow::makePatientsPage() {
     connect(patientDrawerSubmit, &QPushButton::clicked, this, &MainWindow::onPatientDrawerSubmit);
     connect(cancel, &QPushButton::clicked, this, &MainWindow::closePatientDrawer);
     connect(closeDrawer, &QPushButton::clicked, this, &MainWindow::closePatientDrawer);
-    connect(patientTable, &QTableWidget::cellDoubleClicked, this,
-            [this](int row, int column) { openPatientFromTable(patientTable, row, column); });
+    connect(patientTable, &QTableWidget::cellClicked, this,
+            [this](int row, int column) {
+                if (column < 7) openPatientFromTable(patientTable, row, column);
+            });
     onCategoryChanged(patientCategory->currentText());
     return page;
 }
