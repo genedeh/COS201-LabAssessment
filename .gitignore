@@ -1,0 +1,10 @@
+.vscode/
+/build/
+/build-verify/
+/build-scapms/
+/build-final/
+/builddeps/
+clinic_data.json
+*.exe
+*.o
+*.obj
