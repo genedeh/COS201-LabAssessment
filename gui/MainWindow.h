@@ -37,6 +37,8 @@ private:
     QLabel* patientCountCard = nullptr;
     QLabel* appointmentCountCard = nullptr;
     QLabel* waitingCountCard = nullptr;
+    QLabel* dashboardDateLabel = nullptr;
+    QLabel* dashboardWelcomeSummary = nullptr;
 
     QTableWidget* dashboardTable = nullptr;
     QTableWidget* patientTable = nullptr;

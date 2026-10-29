@@ -2,6 +2,7 @@
     <qresource prefix="/assets">
         <file alias="clinic-logo.png">assets/clinic-logo.png</file>
         <file alias="sidebar-care-illustration.png">assets/sidebar-care-illustration.png</file>
+        <file alias="dashboard-care-illustration.png">assets/dashboard-care-illustration.png</file>
     </qresource>
     <qresource prefix="/icons">
         <file alias="dashboard.svg">icons/dashboard.svg</file>

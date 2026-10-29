@@ -393,7 +393,18 @@ void MainWindow::buildUi() {
         "QPushButton#sidebarNavButton:hover{background:#f5f7fb;}"
         "QPushButton#sidebarNavButton[active=\"true\"]{background:#edf3ff;color:#2860d7;font-weight:700;}"
         "#sidebarIllustration{background:transparent;}"
-        "#statCard{background:#fff;border:1px solid #e4e9f0;border-radius:10px;}"
+        "#dashboardDate{color:#7b8798;font-size:12px;}"
+        "#welcomeBanner{background:#4d55e8;border-radius:13px;}"
+        "#welcomeTitle{color:#ffffff;background:transparent;}"
+        "#welcomeSummary{color:#e8eaff;background:transparent;font-size:12px;}"
+        "#dashboardIllustration{background:transparent;}"
+        "QPushButton#welcomePrimaryButton{background:#ffffff;color:#3f4bd6;border:0;border-radius:6px;padding:8px 13px;font-weight:600;}"
+        "QPushButton#welcomePrimaryButton:hover{background:#eef1ff;}"
+        "QPushButton#welcomeSecondaryButton{background:transparent;color:#ffffff;border:1px solid rgba(255,255,255,190);border-radius:6px;padding:8px 13px;font-weight:600;}"
+        "QPushButton#welcomeSecondaryButton:hover{background:rgba(255,255,255,28);}"
+        "QPushButton#dashboardViewAll{background:transparent;color:#3157a4;border:0;padding:5px 8px;font-weight:600;}"
+        "QPushButton#dashboardViewAll:hover{background:#edf3ff;}"
+        "#statCard{background:#fff;border:1px solid #e4e9f0;border-radius:11px;}"
         "#mutedText{color:#778397;} QLineEdit,QComboBox,QSpinBox,QDateTimeEdit{color:#253247;padding:7px;border:1px solid #d8dee8;border-radius:5px;background:white;}"
         "QPushButton{padding:8px 13px;background:#3157a4;color:white;border:0;border-radius:5px;}"
         "QPushButton:hover{background:#27488b;} QTableWidget{color:#253247;background:white;border:1px solid #e2e7ef;gridline-color:#edf0f5;} QTableWidget::item{color:#253247;}"
@@ -429,25 +440,96 @@ QTableWidget* MainWindow::makeTable(const QStringList& headers, QWidget* parent)
 }
 
 QWidget* MainWindow::makeDashboardPage() {
-    auto* page = new QWidget(this); auto* layout = new QVBoxLayout(page);
-    auto* heading = new QLabel("Clinic overview", page); QFont f=heading->font(); f.setPointSize(20); f.setBold(true); heading->setFont(f);
-    layout->addWidget(heading);
+    auto* page = new QWidget(this);
+    auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(24, 20, 24, 20);
+    layout->setSpacing(15);
+
+    auto* headingRow = new QHBoxLayout();
+    auto* heading = new QLabel("Dashboard", page);
+    QFont headingFont = heading->font();
+    headingFont.setPointSize(21);
+    headingFont.setBold(true);
+    heading->setFont(headingFont);
+    dashboardDateLabel = new QLabel(page);
+    dashboardDateLabel->setObjectName("dashboardDate");
+    headingRow->addWidget(heading);
+    headingRow->addStretch();
+    headingRow->addWidget(dashboardDateLabel);
+    layout->addLayout(headingRow);
+
+    auto* welcomeBanner = new QFrame(page);
+    welcomeBanner->setObjectName("welcomeBanner");
+    welcomeBanner->setMinimumHeight(174);
+    auto* bannerLayout = new QHBoxLayout(welcomeBanner);
+    bannerLayout->setContentsMargins(22, 17, 14, 14);
+    bannerLayout->setSpacing(8);
+
+    auto* welcomeContent = new QVBoxLayout();
+    welcomeContent->setSpacing(8);
+    auto* welcomeTitle = new QLabel("Welcome to Smart Clinic", welcomeBanner);
+    welcomeTitle->setObjectName("welcomeTitle");
+    QFont welcomeFont = welcomeTitle->font();
+    welcomeFont.setPointSize(18);
+    welcomeFont.setBold(true);
+    welcomeTitle->setFont(welcomeFont);
+    dashboardWelcomeSummary = new QLabel(welcomeBanner);
+    dashboardWelcomeSummary->setObjectName("welcomeSummary");
+    dashboardWelcomeSummary->setWordWrap(true);
+
+    auto* welcomeActions = new QHBoxLayout();
+    welcomeActions->setSpacing(9);
+    auto* schedule = new QPushButton("Schedule appointment", welcomeBanner);
+    schedule->setObjectName("welcomePrimaryButton");
+    auto* add = new QPushButton("Register patient", welcomeBanner);
+    add->setObjectName("welcomeSecondaryButton");
+    welcomeActions->addWidget(schedule);
+    welcomeActions->addWidget(add);
+    welcomeActions->addStretch();
+    welcomeContent->addWidget(welcomeTitle);
+    welcomeContent->addWidget(dashboardWelcomeSummary);
+    welcomeContent->addLayout(welcomeActions);
+    welcomeContent->addStretch();
+
+    auto* dashboardIllustration = new QLabel(welcomeBanner);
+    dashboardIllustration->setObjectName("dashboardIllustration");
+    dashboardIllustration->setAlignment(Qt::AlignCenter);
+    dashboardIllustration->setMinimumWidth(225);
+    const QPixmap illustration(":/assets/dashboard-care-illustration.png");
+    if (!illustration.isNull())
+        dashboardIllustration->setPixmap(illustration.scaled(300, 172, Qt::KeepAspectRatio,
+                                                             Qt::SmoothTransformation));
+    bannerLayout->addLayout(welcomeContent, 1);
+    bannerLayout->addWidget(dashboardIllustration);
+    layout->addWidget(welcomeBanner);
+
     auto* cards = new QHBoxLayout();
+    cards->setSpacing(14);
     cards->addWidget(makeStatCard("Registered patients", patientCountCard, page));
     cards->addWidget(makeStatCard("Appointments today", appointmentCountCard, page));
     cards->addWidget(makeStatCard("Patients waiting", waitingCountCard, page));
     layout->addLayout(cards);
-    auto* section = new QLabel("Today's appointment schedule", page); QFont sf=section->font(); sf.setPointSize(14); sf.setBold(true); section->setFont(sf);
-    layout->addWidget(section);
+
+    auto* appointmentHeadingRow = new QHBoxLayout();
+    auto* section = new QLabel("Today's appointments", page);
+    QFont sectionFont = section->font();
+    sectionFont.setPointSize(15);
+    sectionFont.setBold(true);
+    section->setFont(sectionFont);
+    auto* viewAll = new QPushButton("View all  →", page);
+    viewAll->setObjectName("dashboardViewAll");
+    appointmentHeadingRow->addWidget(section);
+    appointmentHeadingRow->addStretch();
+    appointmentHeadingRow->addWidget(viewAll);
+    layout->addLayout(appointmentHeadingRow);
+
     dashboardTable = makeTable({"Time", "Patient", "Category", "Visit purpose", "Status"}, page);
+    dashboardTable->verticalHeader()->setDefaultSectionSize(38);
     layout->addWidget(dashboardTable, 1);
-    auto* actions = new QHBoxLayout();
-    auto* add = new QPushButton("Register patient", page);
-    auto* schedule = new QPushButton("Schedule appointment", page);
-    actions->addWidget(add); actions->addWidget(schedule); actions->addStretch();
-    layout->addLayout(actions);
+
     connect(add,&QPushButton::clicked,this,[this](){setCurrentPage(1);patientName->setFocus();});
     connect(schedule,&QPushButton::clicked,this,[this](){setCurrentPage(2);appointmentPatientId->setFocus();});
+    connect(viewAll,&QPushButton::clicked,this,[this](){setCurrentPage(2);});
     return page;
 }
 
@@ -578,13 +660,62 @@ void MainWindow::refreshQueue(){queueTable->setRowCount(0);std::size_t position=
 
 void MainWindow::refreshDashboard(){
     patientCountCard->setText(QString::number(clinic.database().patientCount()));
-    const QString today=QDate::currentDate().toString("yyyy-MM-dd");int todayCount=0;
-    dashboardTable->setRowCount(0);
-    for(const auto&a:clinic.database().getAppointments())if(q(a.getDateTime()).startsWith(today)){
-        ++todayCount;const auto*p=clinic.database().findPatient(a.getPatientId());const int r=dashboardTable->rowCount();dashboardTable->insertRow(r);
-        dashboardTable->setItem(r,0,new QTableWidgetItem(q(a.getDateTime()).mid(11)));dashboardTable->setItem(r,1,new QTableWidgetItem(p?q(p->getName()):q(a.getPatientId())));dashboardTable->setItem(r,2,new QTableWidgetItem(p?q(p->category()):""));dashboardTable->setItem(r,3,new QTableWidgetItem(q(a.getReason())));dashboardTable->setItem(r,4,new QTableWidgetItem(q(scapms::model::appointmentStatusName(a.getStatus()))));
+    const QDate currentDate = QDate::currentDate();
+    const QString today = currentDate.toString("yyyy-MM-dd");
+    dashboardDateLabel->setText(currentDate.toString("dddd, d MMMM yyyy"));
+    std::vector<const scapms::model::Appointment*> todaysAppointments;
+    for (const auto& appointment : clinic.database().getAppointments()) {
+        if (q(appointment.getDateTime()).startsWith(today))
+            todaysAppointments.push_back(&appointment);
     }
-    appointmentCountCard->setText(QString::number(todayCount));waitingCountCard->setText(QString::number(clinic.waitingQueue().size()));
+    std::sort(todaysAppointments.begin(), todaysAppointments.end(), [](const auto* a, const auto* b) {
+        return a->getDateTime() < b->getDateTime();
+    });
+
+    dashboardTable->setRowCount(0);
+    dashboardTable->clearSpans();
+    for (const auto* appointment : todaysAppointments) {
+        const auto* patient = clinic.database().findPatient(appointment->getPatientId());
+        const int row = dashboardTable->rowCount();
+        dashboardTable->insertRow(row);
+        dashboardTable->setItem(row, 0, new QTableWidgetItem(q(appointment->getDateTime()).mid(11)));
+        dashboardTable->setItem(row, 1, new QTableWidgetItem(
+            patient ? q(patient->getName()) : q(appointment->getPatientId())));
+        dashboardTable->setItem(row, 2, new QTableWidgetItem(patient ? q(patient->category()) : ""));
+        dashboardTable->setItem(row, 3, new QTableWidgetItem(q(appointment->getReason())));
+
+        auto* status = new QTableWidgetItem(q(scapms::model::appointmentStatusName(appointment->getStatus())));
+        if (appointment->getStatus() == scapms::model::AppointmentStatus::Pending) {
+            status->setForeground(QBrush(QColor("#067647")));
+            status->setBackground(QBrush(QColor("#ecfdf3")));
+        } else if (appointment->getStatus() == scapms::model::AppointmentStatus::Completed) {
+            status->setForeground(QBrush(QColor("#475467")));
+            status->setBackground(QBrush(QColor("#f2f4f7")));
+        } else {
+            status->setForeground(QBrush(QColor("#b42318")));
+            status->setBackground(QBrush(QColor("#fff1f0")));
+        }
+        dashboardTable->setItem(row, 4, status);
+    }
+    if (todaysAppointments.empty()) {
+        dashboardTable->insertRow(0);
+        auto* emptyState = new QTableWidgetItem("No appointments scheduled for today.");
+        emptyState->setTextAlignment(Qt::AlignCenter);
+        emptyState->setForeground(QBrush(QColor("#778397")));
+        dashboardTable->setItem(0, 0, emptyState);
+        dashboardTable->setSpan(0, 0, 1, dashboardTable->columnCount());
+    }
+
+    const int todayCount = static_cast<int>(todaysAppointments.size());
+    const int waitingCount = static_cast<int>(clinic.waitingQueue().size());
+    appointmentCountCard->setText(QString::number(todayCount));
+    waitingCountCard->setText(QString::number(waitingCount));
+    dashboardWelcomeSummary->setText(
+        QString("%1 appointment%2 on today's schedule, with %3 patient%4 waiting in the queue.")
+            .arg(todayCount)
+            .arg(todayCount == 1 ? "" : "s")
+            .arg(waitingCount)
+            .arg(waitingCount == 1 ? "" : "s"));
 }
 
 void MainWindow::refreshReports(){
