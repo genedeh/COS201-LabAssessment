@@ -10,6 +10,7 @@
 #include "../controller/ClinicManager.h"
 
 class QComboBox;
+class QCompleter;
 class QDateTimeEdit;
 class QFrame;
 class QLabel;
@@ -18,6 +19,7 @@ class QPropertyAnimation;
 class QPushButton;
 class QSpinBox;
 class QStackedWidget;
+class QStringListModel;
 class QTableWidget;
 class QTimer;
 class QWidget;
@@ -68,6 +70,9 @@ private:
     QLineEdit* appointmentSearchText = nullptr;
     QComboBox* appointmentStatusFilter = nullptr;
     QComboBox* appointmentCategoryFilter = nullptr;
+    QLabel* appointmentPatientPreview = nullptr;
+    QCompleter* appointmentPatientCompleter = nullptr;
+    QStringListModel* appointmentPatientSuggestionModel = nullptr;
     QLineEdit* queuePatientId = nullptr;
 
     QLineEdit* queryText = nullptr;
@@ -113,6 +118,8 @@ private:
     void closePatientDrawer();
     void openAppointmentDrawer();
     void closeAppointmentDrawer();
+    void refreshAppointmentPatientSuggestions();
+    void updateAppointmentPatientPreview();
     void populatePatientTable(QTableWidget* table,
                               const std::vector<const scapms::model::PatientRecord*>& patients);
     void onCategoryChanged(const QString& category);

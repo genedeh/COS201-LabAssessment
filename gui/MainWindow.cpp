@@ -6,6 +6,8 @@
 #include <QBrush>
 #include <QColor>
 #include <QComboBox>
+#include <QCompleter>
+#include <QCalendarWidget>
 #include <QDate>
 #include <QDateTime>
 #include <QDateTimeEdit>
@@ -35,12 +37,14 @@
 #include <QSpinBox>
 #include <QStackedLayout>
 #include <QStackedWidget>
+#include <QStringListModel>
 #include <QShortcut>
 #include <QStatusBar>
 #include <QStyle>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QStringList>
 
@@ -611,6 +615,8 @@ void MainWindow::buildUi() {
         "#appointmentDrawer{background:#ffffff;border-left:1px solid #e2e8f0;}"
         "#appointmentOverlay{background:rgba(25,35,60,105);}"
         "#appointmentDrawerTitle{font-size:18px;font-weight:700;color:#253247;}"
+        "#appointmentPatientPreview{color:#475467;background:#f6f8fc;border:1px solid #e6ebf2;border-radius:7px;padding:8px 10px;font-size:11px;}"
+        "#appointmentPatientPreview[valid=\"false\"]{color:#b42318;background:#fff5f4;border-color:#fecdca;}"
         "QPushButton#closePatientDrawerButton{background:#f7f9fc;color:#53627a;border:1px solid #e2e8f0;border-radius:8px;padding:0;font-size:22px;font-weight:400;}"
         "QPushButton#closePatientDrawerButton:hover{background:#edf3ff;color:#3157a4;border-color:#d4e1fb;}"
         "#drawerHint{color:#778397;font-size:11px;}"
@@ -1084,12 +1090,62 @@ QWidget* MainWindow::makeAppointmentsPage() {
     form->setVerticalSpacing(13);
     appointmentPatientId = new QLineEdit(appointmentDrawer);
     appointmentPatientId->setPlaceholderText("e.g. PT0001");
+    appointmentPatientId->setClearButtonEnabled(true);
+    appointmentPatientSuggestionModel = new QStringListModel(this);
+    appointmentPatientCompleter = new QCompleter(appointmentPatientSuggestionModel, appointmentPatientId);
+    appointmentPatientCompleter->setCaseSensitivity(Qt::CaseInsensitive);
+    appointmentPatientCompleter->setFilterMode(Qt::MatchStartsWith);
+    appointmentPatientCompleter->setCompletionMode(QCompleter::PopupCompletion);
+    appointmentPatientId->setCompleter(appointmentPatientCompleter);
+    appointmentPatientPreview = new QLabel("Type a patient ID to see matching registered patients.", appointmentDrawer);
+    appointmentPatientPreview->setObjectName("appointmentPatientPreview");
+    appointmentPatientPreview->setWordWrap(true);
+    auto* patientPicker = new QWidget(appointmentDrawer);
+    auto* patientPickerLayout = new QVBoxLayout(patientPicker);
+    patientPickerLayout->setContentsMargins(0, 0, 0, 0);
+    patientPickerLayout->setSpacing(6);
+    patientPickerLayout->addWidget(appointmentPatientId);
+    patientPickerLayout->addWidget(appointmentPatientPreview);
     appointmentDateTime = new ChevronDateTimeEdit(QDateTime::currentDateTime().addDays(1), appointmentDrawer);
     appointmentDateTime->setCalendarPopup(true);
     appointmentDateTime->setDisplayFormat("yyyy-MM-dd HH:mm");
+    auto* calendar = appointmentDateTime->calendarWidget();
+    calendar->setGridVisible(true);
+    calendar->setStyleSheet(
+        "QCalendarWidget{background:#202124;color:#ffffff;border:1px solid #3d4045;}"
+        "QCalendarWidget QWidget#qt_calendar_navigationbar{background:#3157a4;border:0;}"
+        "QCalendarWidget QToolButton{color:#ffffff;background:transparent;border:0;border-radius:5px;padding:5px;font-weight:600;}"
+        "QCalendarWidget QToolButton:hover{background:#456bb6;}"
+        "QCalendarWidget QToolButton#qt_calendar_monthbutton{min-width:112px;text-align:center;}"
+        "QCalendarWidget QToolButton#qt_calendar_yearbutton{min-width:58px;text-align:center;}"
+        "QCalendarWidget QSpinBox#qt_calendar_yearedit{color:#ffffff;background:#253247;border:1px solid #526078;border-radius:4px;padding:3px;}"
+        "QCalendarWidget QAbstractItemView{background:#202124;color:#ffffff;selection-background-color:#3157a4;selection-color:#ffffff;gridline-color:#3d4045;outline:0;}"
+        "QCalendarWidget QAbstractItemView:disabled{color:#7b8491;}"
+        "QCalendarWidget QHeaderView::section{background:#253247;color:#ffffff;border:0;padding:6px;font-weight:600;}"
+        "QCalendarWidget QMenu{background:#202124;color:#ffffff;border:1px solid #3d4045;}"
+        "QCalendarWidget QMenu::item{color:#ffffff;padding:6px 18px;}"
+        "QCalendarWidget QMenu::item:selected{background:#3157a4;color:#ffffff;}");
+    if (auto* monthButton = calendar->findChild<QToolButton*>("qt_calendar_monthbutton")) {
+        monthButton->setMinimumWidth(112);
+        monthButton->setStyleSheet("text-align:center;");
+    }
+    if (auto* yearButton = calendar->findChild<QToolButton*>("qt_calendar_yearbutton")) {
+        yearButton->setMinimumWidth(58);
+        yearButton->setStyleSheet("text-align:center;");
+    }
+    if (auto* previousMonth = calendar->findChild<QToolButton*>("qt_calendar_prevmonth")) {
+        previousMonth->setText("‹");
+        previousMonth->setIcon(QIcon());
+        previousMonth->setFixedWidth(32);
+    }
+    if (auto* nextMonth = calendar->findChild<QToolButton*>("qt_calendar_nextmonth")) {
+        nextMonth->setText("›");
+        nextMonth->setIcon(QIcon());
+        nextMonth->setFixedWidth(32);
+    }
     appointmentReason = new QLineEdit(appointmentDrawer);
     appointmentReason->setPlaceholderText("Routine check-up, follow-up...");
-    form->addRow("Patient ID", appointmentPatientId);
+    form->addRow("Patient", patientPicker);
     form->addRow("Date and time", appointmentDateTime);
     form->addRow("Visit purpose", appointmentReason);
     drawerLayout->addLayout(form);
@@ -1119,6 +1175,14 @@ QWidget* MainWindow::makeAppointmentsPage() {
     connect(closeDrawer, &QPushButton::clicked, this, &MainWindow::closeAppointmentDrawer);
     connect(cancel, &QPushButton::clicked, this, &MainWindow::closeAppointmentDrawer);
     connect(appointmentDrawerSubmit, &QPushButton::clicked, this, &MainWindow::onScheduleAppointment);
+    connect(appointmentPatientId, &QLineEdit::textChanged, this,
+            [this]() { updateAppointmentPatientPreview(); });
+    connect(appointmentPatientCompleter,
+            qOverload<const QString&>(&QCompleter::activated), this, [this](const QString& completion) {
+                const QString id = completion.section(" — ", 0, 0).trimmed();
+                appointmentPatientId->setText(id);
+                updateAppointmentPatientPreview();
+            });
     connect(appointmentSearchText, &QLineEdit::textChanged, this, [this]() { refreshAppointments(); });
     connect(appointmentStatusFilter, &QComboBox::currentTextChanged, this, [this]() { refreshAppointments(); });
     connect(appointmentCategoryFilter, &QComboBox::currentTextChanged, this, [this]() { refreshAppointments(); });
@@ -1128,6 +1192,7 @@ QWidget* MainWindow::makeAppointmentsPage() {
         appointmentCategoryFilter->setCurrentIndex(0);
         refreshAppointments();
     });
+    refreshAppointmentPatientSuggestions();
     return page;
 }
 
@@ -1215,7 +1280,58 @@ void MainWindow::populatePatientTable(QTableWidget* table,const std::vector<cons
     }
 }
 
-void MainWindow::refreshPatients(){std::vector<const scapms::model::PatientRecord*> patients;for(const auto& p:clinic.database().getPatients())patients.push_back(p.get());populatePatientTable(patientTable,patients);if(patientsCountLabel)patientsCountLabel->setText(QString("%1 patient record%2").arg(patients.size()).arg(patients.size()==1?"":"s"));}
+void MainWindow::refreshPatients(){std::vector<const scapms::model::PatientRecord*> patients;for(const auto& p:clinic.database().getPatients())patients.push_back(p.get());populatePatientTable(patientTable,patients);if(patientsCountLabel)patientsCountLabel->setText(QString("%1 patient record%2").arg(patients.size()).arg(patients.size()==1?"":"s"));refreshAppointmentPatientSuggestions();}
+
+void MainWindow::refreshAppointmentPatientSuggestions() {
+    if (!appointmentPatientSuggestionModel) return;
+    QStringList suggestions;
+    for (const auto& patient : clinic.database().getPatients()) {
+        if (patient)
+            suggestions.push_back(q(patient->getPatientId()) + " — " + q(patient->getName()));
+    }
+    appointmentPatientSuggestionModel->setStringList(suggestions);
+    updateAppointmentPatientPreview();
+}
+
+void MainWindow::updateAppointmentPatientPreview() {
+    if (!appointmentPatientPreview || !appointmentPatientId) return;
+    const QString typedId = appointmentPatientId->text().trimmed();
+    bool valid = true;
+    if (typedId.isEmpty()) {
+        appointmentPatientPreview->setText("Type a patient ID to see matching registered patients.");
+    } else {
+        const scapms::model::PatientRecord* exactMatch = nullptr;
+        bool prefixMatch = false;
+        for (const auto& patient : clinic.database().getPatients()) {
+            const QString id = q(patient->getPatientId());
+            if (id.compare(typedId, Qt::CaseInsensitive) == 0) {
+                exactMatch = patient.get();
+                break;
+            }
+            if (id.startsWith(typedId, Qt::CaseInsensitive)) prefixMatch = true;
+        }
+        if (exactMatch) {
+            const QString canonicalId = q(exactMatch->getPatientId());
+            if (typedId != canonicalId) appointmentPatientId->setText(canonicalId);
+            appointmentPatientPreview->setText(
+                QString("%1  •  %2  •  Age %3  •  %4")
+                    .arg(q(exactMatch->getName()), q(exactMatch->category()))
+                    .arg(exactMatch->getAge())
+                    .arg(q(exactMatch->getContact())));
+        } else if (prefixMatch) {
+            appointmentPatientPreview->setText("Matching patients are available. Use ↓ to choose an ID.");
+        } else {
+            valid = false;
+            appointmentPatientPreview->setText("No registered patient matches this ID.");
+        }
+    }
+    if (appointmentPatientPreview->property("valid").toBool() != valid) {
+        appointmentPatientPreview->setProperty("valid", valid);
+        appointmentPatientPreview->style()->unpolish(appointmentPatientPreview);
+        appointmentPatientPreview->style()->polish(appointmentPatientPreview);
+        appointmentPatientPreview->update();
+    }
+}
 
 void MainWindow::refreshAppointments(){
     if (!appointmentTable) return;
