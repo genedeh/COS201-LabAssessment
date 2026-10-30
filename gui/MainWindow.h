@@ -42,6 +42,7 @@ private:
     QLabel* dashboardDateLabel = nullptr;
     QLabel* dashboardWelcomeSummary = nullptr;
     QLabel* patientsCountLabel = nullptr;
+    QLabel* appointmentsCountLabel = nullptr;
 
     QTableWidget* dashboardTable = nullptr;
     QTableWidget* patientTable = nullptr;
@@ -64,6 +65,9 @@ private:
     QLineEdit* appointmentPatientId = nullptr;
     QDateTimeEdit* appointmentDateTime = nullptr;
     QLineEdit* appointmentReason = nullptr;
+    QLineEdit* appointmentSearchText = nullptr;
+    QComboBox* appointmentStatusFilter = nullptr;
+    QComboBox* appointmentCategoryFilter = nullptr;
     QLineEdit* queuePatientId = nullptr;
 
     QLineEdit* queryText = nullptr;
@@ -77,6 +81,12 @@ private:
     QPropertyAnimation* patientDrawerAnimation = nullptr;
     bool editingPatient = false;
     bool closingPatientDrawer = false;
+
+    QWidget* appointmentOverlay = nullptr;
+    QFrame* appointmentDrawer = nullptr;
+    QPushButton* appointmentDrawerSubmit = nullptr;
+    QPropertyAnimation* appointmentDrawerAnimation = nullptr;
+    bool closingAppointmentDrawer = false;
 
     QTimer* refreshTimer = nullptr;
     int lastReminderMinute = -1;
@@ -101,6 +111,8 @@ private:
     void refreshReports();
     void openPatientDrawer(const QString& patientId = QString());
     void closePatientDrawer();
+    void openAppointmentDrawer();
+    void closeAppointmentDrawer();
     void populatePatientTable(QTableWidget* table,
                               const std::vector<const scapms::model::PatientRecord*>& patients);
     void onCategoryChanged(const QString& category);

@@ -564,6 +564,11 @@ void MainWindow::buildUi() {
         "#patientDrawer{background:#ffffff;border-left:1px solid #e2e8f0;}"
         "#patientOverlay{background:rgba(25,35,60,105);}"
         "#patientDrawerTitle{font-size:18px;font-weight:700;color:#253247;}"
+        "#appointmentCount{color:#778397;font-size:12px;}"
+        "#appointmentSearchControls{background:#ffffff;border:1px solid #e4e9f0;border-radius:11px;}"
+        "#appointmentDrawer{background:#ffffff;border-left:1px solid #e2e8f0;}"
+        "#appointmentOverlay{background:rgba(25,35,60,105);}"
+        "#appointmentDrawerTitle{font-size:18px;font-weight:700;color:#253247;}"
         "QPushButton#closePatientDrawerButton{background:#f7f9fc;color:#53627a;border:1px solid #e2e8f0;border-radius:8px;padding:0;font-size:22px;font-weight:400;}"
         "QPushButton#closePatientDrawerButton:hover{background:#edf3ff;color:#3157a4;border-color:#d4e1fb;}"
         "#drawerHint{color:#778397;font-size:11px;}"
@@ -582,6 +587,9 @@ void MainWindow::buildUi() {
         "QTableWidget#dashboardAppointmentsTable{background:#ffffff;alternate-background-color:#f8faff;border:0;gridline-color:transparent;selection-background-color:#f0f5ff;outline:0;}"
         "QTableWidget#dashboardAppointmentsTable::item{border:0;padding:10px 9px;color:#344054;}"
         "QTableWidget#dashboardAppointmentsTable QHeaderView::section{background:#ffffff;color:#667085;border:0;border-bottom:1px solid #e6ebf2;padding:11px 9px;font-weight:600;}"
+        "QTableWidget#appointmentRecordsTable{background:#ffffff;alternate-background-color:#f8faff;border:0;gridline-color:transparent;selection-background-color:#f0f5ff;outline:0;}"
+        "QTableWidget#appointmentRecordsTable::item{border:0;padding:10px 9px;color:#344054;}"
+        "QTableWidget#appointmentRecordsTable QHeaderView::section{background:#ffffff;color:#667085;border:0;border-bottom:1px solid #e6ebf2;padding:11px 9px;font-weight:600;}"
         "#mutedText{color:#778397;} QLineEdit,QComboBox,QSpinBox,QDateTimeEdit{color:#253247;padding:8px 10px;border:1px solid #d8dee8;border-radius:7px;background:#ffffff;}"
         "QComboBox::drop-down{ subcontrol-origin:padding;subcontrol-position:top right;width:30px;border:0;background:transparent;}"
         "QComboBox::down-arrow{image:none;width:0;height:0;}"
@@ -603,6 +611,7 @@ void MainWindow::buildUi() {
 void MainWindow::setCurrentPage(int pageIndex) {
     if (!pages || pageIndex < 0 || pageIndex >= pages->count()) return;
     if (pageIndex != 1 && patientOverlay && patientOverlay->isVisible()) closePatientDrawer();
+    if (pageIndex != 2 && appointmentOverlay && appointmentOverlay->isVisible()) closeAppointmentDrawer();
     pages->setCurrentIndex(pageIndex);
     const QColor activeColor("#2860d7");
     const QColor inactiveColor("#718096");
@@ -935,18 +944,148 @@ QWidget* MainWindow::makePatientsPage() {
 }
 
 QWidget* MainWindow::makeAppointmentsPage() {
-    auto* page=new QWidget(this);auto* layout=new QVBoxLayout(page);
-    auto* heading=new QLabel("Appointment management",page);QFont f=heading->font();f.setPointSize(20);f.setBold(true);heading->setFont(f);layout->addWidget(heading);
-    auto* box=new QGroupBox("Schedule a visit",page);auto* form=new QGridLayout(box);
-    appointmentPatientId=new QLineEdit(box);appointmentPatientId->setPlaceholderText("PT0001");
-    appointmentDateTime=new ChevronDateTimeEdit(QDateTime::currentDateTime().addDays(1),box);appointmentDateTime->setCalendarPopup(true);appointmentDateTime->setDisplayFormat("yyyy-MM-dd HH:mm");
-    appointmentReason=new QLineEdit(box);appointmentReason->setPlaceholderText("Routine check-up, follow-up...");
-    auto* schedule=new QPushButton("Schedule appointment",box);auto* cancel=new QPushButton("Cancel selected",box);auto* complete=new QPushButton("Mark completed",box);
-    form->addWidget(new QLabel("Patient ID"),0,0);form->addWidget(appointmentPatientId,0,1);form->addWidget(new QLabel("Date and time"),0,2);form->addWidget(appointmentDateTime,0,3);
-    form->addWidget(new QLabel("Visit purpose"),1,0);form->addWidget(appointmentReason,1,1,1,3);form->addWidget(schedule,2,0);form->addWidget(cancel,2,1);form->addWidget(complete,2,2);
-    layout->addWidget(box);appointmentTable=makeTable({"Appointment ID","Patient ID","Patient","Date and time","Purpose","Status"},page);layout->addWidget(appointmentTable,1);
-    connect(schedule,&QPushButton::clicked,this,&MainWindow::onScheduleAppointment);connect(cancel,&QPushButton::clicked,this,&MainWindow::onCancelAppointment);connect(complete,&QPushButton::clicked,this,&MainWindow::onCompleteAppointment);
-    connect(appointmentTable,&QTableWidget::cellDoubleClicked,this,[this](int row,int){if(appointmentTable->item(row,1))appointmentPatientId->setText(appointmentTable->item(row,1)->text());});
+    auto* page = new QWidget(this);
+    auto* stack = new QStackedLayout(page);
+    stack->setStackingMode(QStackedLayout::StackAll);
+
+    auto* content = new QWidget(page);
+    auto* layout = new QVBoxLayout(content);
+    layout->setContentsMargins(24, 22, 24, 22);
+    layout->setSpacing(15);
+    auto* headingRow = new QHBoxLayout();
+    auto* heading = new QLabel("Appointments", content);
+    QFont headingFont = heading->font();
+    headingFont.setPointSize(21);
+    headingFont.setBold(true);
+    heading->setFont(headingFont);
+    appointmentsCountLabel = new QLabel("0 appointments", content);
+    appointmentsCountLabel->setObjectName("appointmentCount");
+    headingRow->addWidget(heading);
+    headingRow->addSpacing(8);
+    headingRow->addWidget(appointmentsCountLabel);
+    headingRow->addStretch();
+    auto* addAppointment = new QPushButton("+  Schedule appointment", content);
+    addAppointment->setObjectName("addPatientButton");
+    headingRow->addWidget(addAppointment);
+    layout->addLayout(headingRow);
+
+    auto* controls = new QFrame(content);
+    controls->setObjectName("appointmentSearchControls");
+    auto* controlsLayout = new QHBoxLayout(controls);
+    controlsLayout->setContentsMargins(14, 12, 14, 12);
+    controlsLayout->setSpacing(10);
+    appointmentSearchText = new QLineEdit(controls);
+    appointmentSearchText->setPlaceholderText("Search by patient, appointment ID, or visit purpose");
+    appointmentStatusFilter = new ChevronComboBox(controls);
+    appointmentStatusFilter->addItems({"All statuses", "Pending", "Completed", "Cancelled"});
+    appointmentCategoryFilter = new ChevronComboBox(controls);
+    appointmentCategoryFilter->addItems({"All categories", "General", "Emergency", "Follow-up"});
+    auto* clearFilters = new QPushButton("Clear", controls);
+    clearFilters->setObjectName("drawerCancelButton");
+    controlsLayout->addWidget(appointmentSearchText, 1);
+    controlsLayout->addWidget(appointmentStatusFilter);
+    controlsLayout->addWidget(appointmentCategoryFilter);
+    controlsLayout->addWidget(clearFilters);
+    layout->addWidget(controls);
+
+    appointmentTable = makeTable({"Date & time", "Appointment ID", "Patient", "Category", "Visit purpose", "Status", ""}, content);
+    appointmentTable->setObjectName("appointmentRecordsTable");
+    appointmentTable->setShowGrid(false);
+    appointmentTable->verticalHeader()->setDefaultSectionSize(52);
+    appointmentTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    appointmentTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    appointmentTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    appointmentTable->horizontalHeader()->setSectionResizeMode(5, QHeaderView::ResizeToContents);
+    appointmentTable->horizontalHeader()->setSectionResizeMode(6, QHeaderView::Fixed);
+    appointmentTable->setColumnWidth(6, 48);
+    auto* tableCard = new QFrame(content);
+    tableCard->setObjectName("appointmentsCard");
+    auto* tableCardLayout = new QVBoxLayout(tableCard);
+    tableCardLayout->setContentsMargins(12, 3, 12, 8);
+    tableCardLayout->setSpacing(0);
+    tableCardLayout->addWidget(appointmentTable);
+    layout->addWidget(tableCard, 1);
+    stack->addWidget(content);
+
+    appointmentOverlay = new QWidget(page);
+    appointmentOverlay->setObjectName("appointmentOverlay");
+    appointmentOverlay->hide();
+    auto* overlayLayout = new QHBoxLayout(appointmentOverlay);
+    overlayLayout->setContentsMargins(0, 0, 0, 0);
+    overlayLayout->addStretch();
+    appointmentDrawer = new QFrame(appointmentOverlay);
+    appointmentDrawer->setObjectName("appointmentDrawer");
+    appointmentDrawer->setMinimumWidth(0);
+    appointmentDrawer->setMaximumWidth(0);
+    appointmentDrawer->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+    auto* drawerLayout = new QVBoxLayout(appointmentDrawer);
+    drawerLayout->setContentsMargins(25, 26, 25, 22);
+    drawerLayout->setSpacing(17);
+    auto* drawerHeadingRow = new QHBoxLayout();
+    auto* drawerTitle = new QLabel("Schedule appointment", appointmentDrawer);
+    drawerTitle->setObjectName("appointmentDrawerTitle");
+    auto* closeDrawer = new QPushButton("×", appointmentDrawer);
+    closeDrawer->setObjectName("closePatientDrawerButton");
+    closeDrawer->setFixedSize(38, 38);
+    closeDrawer->setToolTip("Close appointment form");
+    drawerHeadingRow->addWidget(drawerTitle);
+    drawerHeadingRow->addStretch();
+    drawerHeadingRow->addWidget(closeDrawer);
+    auto* hint = new QLabel("Choose a registered patient, set the visit time, and enter the purpose.", appointmentDrawer);
+    hint->setObjectName("drawerHint");
+    hint->setWordWrap(true);
+    drawerLayout->addLayout(drawerHeadingRow);
+    drawerLayout->addWidget(hint);
+    drawerLayout->addSpacing(4);
+    auto* form = new QFormLayout();
+    form->setLabelAlignment(Qt::AlignLeft);
+    form->setVerticalSpacing(13);
+    appointmentPatientId = new QLineEdit(appointmentDrawer);
+    appointmentPatientId->setPlaceholderText("e.g. PT0001");
+    appointmentDateTime = new ChevronDateTimeEdit(QDateTime::currentDateTime().addDays(1), appointmentDrawer);
+    appointmentDateTime->setCalendarPopup(true);
+    appointmentDateTime->setDisplayFormat("yyyy-MM-dd HH:mm");
+    appointmentReason = new QLineEdit(appointmentDrawer);
+    appointmentReason->setPlaceholderText("Routine check-up, follow-up...");
+    form->addRow("Patient ID", appointmentPatientId);
+    form->addRow("Date and time", appointmentDateTime);
+    form->addRow("Visit purpose", appointmentReason);
+    drawerLayout->addLayout(form);
+    drawerLayout->addStretch();
+    auto* drawerActions = new QHBoxLayout();
+    auto* cancel = new QPushButton("Cancel", appointmentDrawer);
+    cancel->setObjectName("drawerCancelButton");
+    appointmentDrawerSubmit = new QPushButton("Schedule appointment", appointmentDrawer);
+    appointmentDrawerSubmit->setObjectName("drawerPrimaryButton");
+    drawerActions->addStretch();
+    drawerActions->addWidget(cancel);
+    drawerActions->addWidget(appointmentDrawerSubmit);
+    drawerLayout->addLayout(drawerActions);
+    overlayLayout->addWidget(appointmentDrawer);
+    stack->addWidget(appointmentOverlay);
+
+    appointmentDrawerAnimation = new QPropertyAnimation(appointmentDrawer, "maximumWidth", this);
+    appointmentDrawerAnimation->setDuration(230);
+    appointmentDrawerAnimation->setEasingCurve(QEasingCurve::OutCubic);
+    connect(appointmentDrawerAnimation, &QPropertyAnimation::finished, this, [this]() {
+        if (closingAppointmentDrawer) {
+            appointmentOverlay->hide();
+            closingAppointmentDrawer = false;
+        }
+    });
+    connect(addAppointment, &QPushButton::clicked, this, &MainWindow::openAppointmentDrawer);
+    connect(closeDrawer, &QPushButton::clicked, this, &MainWindow::closeAppointmentDrawer);
+    connect(cancel, &QPushButton::clicked, this, &MainWindow::closeAppointmentDrawer);
+    connect(appointmentDrawerSubmit, &QPushButton::clicked, this, &MainWindow::onScheduleAppointment);
+    connect(appointmentSearchText, &QLineEdit::textChanged, this, [this]() { refreshAppointments(); });
+    connect(appointmentStatusFilter, &QComboBox::currentTextChanged, this, [this]() { refreshAppointments(); });
+    connect(appointmentCategoryFilter, &QComboBox::currentTextChanged, this, [this]() { refreshAppointments(); });
+    connect(clearFilters, &QPushButton::clicked, this, [this]() {
+        appointmentSearchText->clear();
+        appointmentStatusFilter->setCurrentIndex(0);
+        appointmentCategoryFilter->setCurrentIndex(0);
+        refreshAppointments();
+    });
     return page;
 }
 
@@ -1037,12 +1176,108 @@ void MainWindow::populatePatientTable(QTableWidget* table,const std::vector<cons
 void MainWindow::refreshPatients(){std::vector<const scapms::model::PatientRecord*> patients;for(const auto& p:clinic.database().getPatients())patients.push_back(p.get());populatePatientTable(patientTable,patients);if(patientsCountLabel)patientsCountLabel->setText(QString("%1 patient record%2").arg(patients.size()).arg(patients.size()==1?"":"s"));}
 
 void MainWindow::refreshAppointments(){
+    if (!appointmentTable) return;
+    appointmentTable->clearSpans();
     appointmentTable->setRowCount(0);
-    auto appointments=clinic.database().getAppointments();
-    std::sort(appointments.begin(),appointments.end(),[](const auto&a,const auto&b){return a.getDateTime()<b.getDateTime();});
-    for(const auto& appointment:appointments){const int r=appointmentTable->rowCount();appointmentTable->insertRow(r);const auto* patient=clinic.database().findPatient(appointment.getPatientId());
-        auto* id=new QTableWidgetItem(q(appointment.getId()));id->setData(Qt::UserRole,q(appointment.getId()));appointmentTable->setItem(r,0,id);appointmentTable->setItem(r,1,new QTableWidgetItem(q(appointment.getPatientId())));appointmentTable->setItem(r,2,new QTableWidgetItem(patient?q(patient->getName()):"Unknown patient"));appointmentTable->setItem(r,3,new QTableWidgetItem(q(appointment.getDateTime())));appointmentTable->setItem(r,4,new QTableWidgetItem(q(appointment.getReason())));
-        auto* status=new QTableWidgetItem(q(scapms::model::appointmentStatusName(appointment.getStatus())));if(appointment.getStatus()==scapms::model::AppointmentStatus::Pending)status->setForeground(QBrush(QColor("#027a48")));else if(appointment.getStatus()==scapms::model::AppointmentStatus::Cancelled)status->setForeground(QBrush(QColor("#b42318")));appointmentTable->setItem(r,5,status);
+    auto appointments = clinic.database().getAppointments();
+    std::sort(appointments.begin(), appointments.end(), [](const auto& a, const auto& b) {
+        return a.getDateTime() < b.getDateTime();
+    });
+
+    const QString query = appointmentSearchText ? appointmentSearchText->text().trimmed() : QString();
+    const QString statusFilter = appointmentStatusFilter ? appointmentStatusFilter->currentText() : "All statuses";
+    const QString categoryFilter = appointmentCategoryFilter ? appointmentCategoryFilter->currentText() : "All categories";
+    int visibleCount = 0;
+    for (const auto& appointment : appointments) {
+        const auto* patient = clinic.database().findPatient(appointment.getPatientId());
+        const QString statusName = q(scapms::model::appointmentStatusName(appointment.getStatus()));
+        const QString categoryName = patient ? q(patient->category()) : QString();
+        const QString patientName = patient ? q(patient->getName()) : QString("Unknown patient");
+        const QString appointmentId = q(appointment.getId());
+        const QString patientIdValue = q(appointment.getPatientId());
+        const QString reason = q(appointment.getReason());
+        const QString haystack = QString("%1 %2 %3 %4")
+                                     .arg(appointmentId, patientIdValue, patientName, reason);
+        if (!query.isEmpty() && !haystack.contains(query, Qt::CaseInsensitive)) continue;
+        if (statusFilter != "All statuses" && statusName != statusFilter) continue;
+        if (categoryFilter != "All categories" && categoryName != categoryFilter) continue;
+
+        const int row = appointmentTable->rowCount();
+        appointmentTable->insertRow(row);
+        auto* dateTime = new QTableWidgetItem(q(appointment.getDateTime()));
+        dateTime->setData(Qt::UserRole, appointmentId);
+        appointmentTable->setItem(row, 0, dateTime);
+        appointmentTable->setItem(row, 1, new QTableWidgetItem(appointmentId));
+        appointmentTable->setItem(row, 2, new QTableWidgetItem(patientName));
+
+        auto* category = new QTableWidgetItem(categoryName.isEmpty() ? "Unknown" : categoryName);
+        if (patient) {
+            const QColor color = categoryName == "Emergency" ? QColor("#c43228")
+                               : categoryName == "Follow-up" ? QColor("#7651c7")
+                                                             : QColor("#3265db");
+            const QString iconKind = categoryName == "Emergency" ? "emergency"
+                                   : categoryName == "Follow-up" ? "follow-up" : "general";
+            category->setIcon(tableMarkerIcon(iconKind, color));
+            category->setForeground(QBrush(color));
+        }
+        appointmentTable->setItem(row, 3, category);
+        appointmentTable->setItem(row, 4, new QTableWidgetItem(reason));
+
+        auto* status = new QTableWidgetItem(statusName);
+        QColor statusColor;
+        QString statusIcon;
+        switch (appointment.getStatus()) {
+        case scapms::model::AppointmentStatus::Pending:
+            statusColor = QColor("#b54708"); statusIcon = "pending"; break;
+        case scapms::model::AppointmentStatus::Completed:
+            statusColor = QColor("#067647"); statusIcon = "completed"; break;
+        case scapms::model::AppointmentStatus::Cancelled:
+            statusColor = QColor("#b42318"); statusIcon = "cancelled"; break;
+        }
+        status->setIcon(tableMarkerIcon(statusIcon, statusColor));
+        status->setForeground(QBrush(statusColor));
+        appointmentTable->setItem(row, 5, status);
+
+        auto* actions = new QPushButton("⋮", appointmentTable);
+        actions->setObjectName("patientActionButton");
+        actions->setToolTip("Appointment actions");
+        appointmentTable->setCellWidget(row, 6, actions);
+        const bool isPending = appointment.getStatus() == scapms::model::AppointmentStatus::Pending;
+        connect(actions, &QPushButton::clicked, this, [this, actions, row, appointmentId, isPending]() {
+            QMenu menu(this);
+            menu.setStyleSheet("QMenu{background:#ffffff;border:1px solid #e4e9f0;padding:5px;}"
+                               "QMenu::item{padding:8px 24px 8px 8px;border-radius:5px;}"
+                               "QMenu::item:selected{background:#edf3ff;color:#3157a4;}"
+                               "QMenu::item:disabled{color:#98a2b3;}");
+            QAction* completeAction = menu.addAction(tableMarkerIcon("completed", QColor("#067647")),
+                                                      "Mark as complete");
+            QAction* cancelAction = menu.addAction(tableMarkerIcon("cancelled", QColor("#b42318")),
+                                                    "Cancel appointment");
+            completeAction->setEnabled(isPending);
+            cancelAction->setEnabled(isPending);
+            QAction* chosen = menu.exec(actions->mapToGlobal(QPoint(0, actions->height())));
+            appointmentTable->selectRow(row);
+            if (chosen == completeAction) onCompleteAppointment();
+            else if (chosen == cancelAction) onCancelAppointment();
+            Q_UNUSED(appointmentId);
+        });
+        ++visibleCount;
+    }
+
+    if (appointmentsCountLabel)
+        appointmentsCountLabel->setText(QString("%1 appointment%2")
+                                            .arg(visibleCount)
+                                            .arg(visibleCount == 1 ? "" : "s"));
+    if (visibleCount == 0) {
+        appointmentTable->insertRow(0);
+        auto* empty = new QTableWidgetItem(query.isEmpty() && statusFilter == "All statuses" &&
+                                           categoryFilter == "All categories"
+                                               ? "No appointments scheduled yet."
+                                               : "No appointments match these filters.");
+        empty->setTextAlignment(Qt::AlignCenter);
+        empty->setForeground(QBrush(QColor("#778397")));
+        appointmentTable->setItem(0, 0, empty);
+        appointmentTable->setSpan(0, 0, 1, appointmentTable->columnCount());
     }
 }
 
@@ -1193,6 +1428,31 @@ void MainWindow::closePatientDrawer() {
     patientDrawerAnimation->start();
 }
 
+void MainWindow::openAppointmentDrawer() {
+    if (!appointmentOverlay || !appointmentDrawer) return;
+    appointmentDrawerAnimation->stop();
+    closingAppointmentDrawer = false;
+    appointmentPatientId->clear();
+    appointmentDateTime->setDateTime(QDateTime::currentDateTime().addDays(1));
+    appointmentReason->clear();
+    appointmentOverlay->show();
+    appointmentOverlay->raise();
+    appointmentDrawer->setMaximumWidth(0);
+    appointmentDrawerAnimation->setStartValue(0);
+    appointmentDrawerAnimation->setEndValue(440);
+    appointmentDrawerAnimation->start();
+    appointmentPatientId->setFocus();
+}
+
+void MainWindow::closeAppointmentDrawer() {
+    if (!appointmentOverlay || !appointmentOverlay->isVisible()) return;
+    appointmentDrawerAnimation->stop();
+    closingAppointmentDrawer = true;
+    appointmentDrawerAnimation->setStartValue(appointmentDrawer->maximumWidth());
+    appointmentDrawerAnimation->setEndValue(0);
+    appointmentDrawerAnimation->start();
+}
+
 void MainWindow::onPatientDrawerSubmit() {
     if (editingPatient) onEditPatient();
     else onAddPatient();
@@ -1201,9 +1461,9 @@ void MainWindow::onPatientDrawerSubmit() {
 void MainWindow::onAddPatient(){try{QString id=patientId->text().trimmed();if(id.isEmpty())id=q(clinic.ids().nextAvailable("PT",[this](const std::string& candidate){return clinic.database().findPatient(candidate)!=nullptr;}));clinic.patients().add(clinic.database(),s(patientCategory->currentText()),s(id),patientName->text().trimmed().toUtf8().toStdString(),patientAge->value(),patientContact->text().trimmed().toUtf8().toStdString(),patientDetail->text().trimmed().toUtf8().toStdString());refreshAll();closePatientDrawer();persistAfterChange("Patient " + id + " registered and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onEditPatient(){try{if(patientId->text().trimmed().isEmpty())throw scapms::utils::ClinicException("Select a patient or enter a patient ID first.");clinic.patients().edit(clinic.database(),s(patientId->text().trimmed()),s(patientName->text().trimmed()),patientAge->value(),s(patientContact->text().trimmed()),s(patientCategory->currentText()),s(patientDetail->text().trimmed()));refreshAll();closePatientDrawer();persistAfterChange("Patient record updated and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onDeletePatient(){try{if(patientId->text().trimmed().isEmpty())throw scapms::utils::ClinicException("Select a patient record first.");const std::string id=s(patientId->text().trimmed());clinic.patients().remove(clinic.database(),clinic.waitingQueue(),id);refreshAll();persistAfterChange("Patient record deleted and saved. Use Undo to restore it.");}catch(const std::exception&e){showError(e);}}
-void MainWindow::onScheduleAppointment(){try{const std::string id=clinic.appointments().schedule(clinic.database(),s(appointmentPatientId->text().trimmed()),s(appointmentDateTime->dateTime().toString("yyyy-MM-dd HH:mm")),s(appointmentReason->text().trimmed()));appointmentReason->clear();refreshAll();persistAfterChange("Appointment " + q(id) + " scheduled and saved.");}catch(const std::exception&e){showError(e);}}
-void MainWindow::onCancelAppointment(){try{const int r=appointmentTable->currentRow();if(r<0)throw scapms::utils::ClinicException("Select an appointment first.");clinic.appointments().cancel(clinic.database(),s(appointmentTable->item(r,0)->text()));refreshAll();persistAfterChange("Appointment cancelled and saved.");}catch(const std::exception&e){showError(e);}}
-void MainWindow::onCompleteAppointment(){try{const int r=appointmentTable->currentRow();if(r<0)throw scapms::utils::ClinicException("Select an appointment first.");clinic.appointments().complete(clinic.database(),s(appointmentTable->item(r,0)->text()));refreshAll();persistAfterChange("Appointment marked completed and saved.");}catch(const std::exception&e){showError(e);}}
+void MainWindow::onScheduleAppointment(){try{const std::string id=clinic.appointments().schedule(clinic.database(),s(appointmentPatientId->text().trimmed()),s(appointmentDateTime->dateTime().toString("yyyy-MM-dd HH:mm")),s(appointmentReason->text().trimmed()));appointmentReason->clear();refreshAll();closeAppointmentDrawer();persistAfterChange("Appointment " + q(id) + " scheduled and saved.");}catch(const std::exception&e){showError(e);}}
+void MainWindow::onCancelAppointment(){try{const int r=appointmentTable->currentRow();if(r<0||!appointmentTable->item(r,0))throw scapms::utils::ClinicException("Select an appointment first.");const QString id=appointmentTable->item(r,0)->data(Qt::UserRole).toString();if(id.isEmpty())throw scapms::utils::ClinicException("Select an appointment first.");clinic.appointments().cancel(clinic.database(),s(id));refreshAll();persistAfterChange("Appointment cancelled and saved.");}catch(const std::exception&e){showError(e);}}
+void MainWindow::onCompleteAppointment(){try{const int r=appointmentTable->currentRow();if(r<0||!appointmentTable->item(r,0))throw scapms::utils::ClinicException("Select an appointment first.");const QString id=appointmentTable->item(r,0)->data(Qt::UserRole).toString();if(id.isEmpty())throw scapms::utils::ClinicException("Select an appointment first.");clinic.appointments().complete(clinic.database(),s(id));refreshAll();persistAfterChange("Appointment marked completed and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onJoinQueue(){try{clinic.appointments().joinQueue(clinic.database(),clinic.waitingQueue(),s(queuePatientId->text().trimmed()));queuePatientId->clear();refreshAll();persistAfterChange("Patient added to the queue and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onCallNext(){const std::string id=clinic.appointments().callNext(clinic.waitingQueue());if(id.empty()){showClinicMessage(this,QMessageBox::Information,"Waiting queue","The waiting queue is empty.");return;}const auto*p=clinic.database().findPatient(id);refreshAll();persistAfterChange("Called the next patient and saved the queue.");showClinicMessage(this,QMessageBox::Information,"Call next patient",p?"Please call " + q(p->getName()) + " ("+q(id)+").":"Please call patient "+q(id)+".");}
 
