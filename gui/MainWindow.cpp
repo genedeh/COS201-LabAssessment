@@ -620,6 +620,9 @@ void MainWindow::buildUi() {
         "#appointmentDrawer{background:#ffffff;border-left:1px solid #e2e8f0;}"
         "#appointmentOverlay{background:rgba(25,35,60,105);}"
         "#appointmentDrawerTitle{font-size:18px;font-weight:700;color:#253247;}"
+        "QWidget#reportsPage,QWidget#reportsContent{background:#f5f7fb;}"
+        "QScrollArea#reportsScroll{background:#f5f7fb;border:0;}"
+        "QScrollArea#reportsScroll QWidget#qt_scrollarea_viewport{background:#f5f7fb;}"
         "#reportDateBadge{color:#3157a4;background:#edf3ff;border:1px solid #dce8ff;border-radius:7px;padding:7px 10px;font-weight:600;}"
         "#reportCard{background:#ffffff;border:1px solid #e5eaf2;border-radius:12px;}"
         "#reportCardTitle{font-size:14px;font-weight:700;color:#253247;}"
@@ -1331,12 +1334,15 @@ QWidget* MainWindow::makeQueuePage() {
 
 QWidget* MainWindow::makeReportsPage() {
     auto* page = new QWidget(this);
+    page->setObjectName("reportsPage");
     auto* pageLayout = new QVBoxLayout(page);
     pageLayout->setContentsMargins(0, 0, 0, 0);
     auto* scroll = new QScrollArea(page);
+    scroll->setObjectName("reportsScroll");
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     auto* content = new QWidget(scroll);
+    content->setObjectName("reportsContent");
     auto* layout = new QVBoxLayout(content);
     layout->setContentsMargins(24, 22, 24, 22);
     layout->setSpacing(15);
@@ -1356,6 +1362,7 @@ QWidget* MainWindow::makeReportsPage() {
     reportDateLabel = new QLabel(content);
     reportDateLabel->setObjectName("reportDateBadge");
     auto* refresh = new QPushButton("Refresh reports", content);
+    reportDateLabel->setAlignment(Qt::AlignCenter);
     headingRow->addLayout(titleBlock);
     headingRow->addStretch();
     headingRow->addWidget(reportDateLabel);
@@ -1418,6 +1425,9 @@ QWidget* MainWindow::makeReportsPage() {
     scroll->setWidget(content);
     pageLayout->addWidget(scroll);
     connect(refresh, &QPushButton::clicked, this, &MainWindow::refreshReports);
+    QTimer::singleShot(0, this, [this, refresh]() {
+        if (reportDateLabel) reportDateLabel->setFixedHeight(refresh->sizeHint().height());
+    });
     return page;
 }
 
