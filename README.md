@@ -27,7 +27,7 @@ cmake --build build-final
 ./build-final/scapms.exe
 ```
 
-The first launch loads `clinic_seed.json` copied beside the executable. Changes are saved in `clinic_data.json` beside the executable. Use **File > Load JSON** to open another saved clinic file or **File > Save As JSON** to export one. If the window is already open during a rebuild, close it first so Windows releases the executable file.
+The first launch loads `clinic_seed.json` copied beside the executable. Changes are saved in `clinic_data.json` beside the executable. Use **File > New clinic** to create an empty clinic in a new JSON file; the current file is preserved, and the new file becomes the active save target for this session. Use **File > Load JSON** to open another saved clinic file or **File > Save As JSON** to export one. If the window is already open during a rebuild, close it first so Windows releases the executable file.
 
 ## Architecture
 

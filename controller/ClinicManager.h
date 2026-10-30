@@ -41,6 +41,13 @@ public:
     ReportController& reports() { return reportController; }
     utils::IDGenerator& ids() { return idGenerator; }
     void clearHistory() { adminHistory = model::AdminActionHistory{}; }
+    void reset() {
+        clinicDatabase.clear();
+        consultationQueue.restore({});
+        patientAccessCache.clear();
+        adminHistory = model::AdminActionHistory{};
+        idGenerator = utils::IDGenerator{};
+    }
 };
 
 } // namespace scapms::controller

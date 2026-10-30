@@ -66,6 +66,22 @@ namespace {
 QString q(const std::string& value) { return QString::fromStdString(value); }
 std::string s(const QString& value) { return value.toUtf8().toStdString(); }
 
+const QPixmap& clinicLogoSource() {
+    static const QPixmap logo(":/assets/clinic-logo.png");
+    return logo;
+}
+
+QPixmap clinicLogoPixmap(const QSize& size) {
+    const auto& source = clinicLogoSource();
+    return source.isNull()
+        ? QPixmap{}
+        : source.scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+}
+
+QIcon clinicLogoIcon() {
+    return QIcon(clinicLogoSource());
+}
+
 void paintChevron(QPainter& painter, const QRectF& bounds, bool pointsUp, const QColor& color) {
 #ifdef SCAPMS_HAS_QT_SVG
     QSvgRenderer renderer(QString(":/icons/") + (pointsUp ? "chevron-up.svg" : "chevron-down.svg"));
@@ -304,7 +320,16 @@ QIcon fileActionIcon(const QString& kind) {
     painter.setPen(QPen(QColor("#f8fafc"), 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter.setBrush(Qt::NoBrush);
 
-    if (kind == "save") {
+    if (kind == "new") {
+        QPainterPath document;
+        document.moveTo(6, 3); document.lineTo(15, 3); document.lineTo(19, 7);
+        document.lineTo(19, 21); document.lineTo(6, 21); document.closeSubpath();
+        painter.drawPath(document);
+        painter.drawLine(QPointF(15, 3), QPointF(15, 7));
+        painter.drawLine(QPointF(15, 7), QPointF(19, 7));
+        painter.drawLine(QPointF(9, 14), QPointF(16, 14));
+        painter.drawLine(QPointF(12.5, 10.5), QPointF(12.5, 17.5));
+    } else if (kind == "save") {
         painter.drawRoundedRect(QRectF(4, 3, 16, 18), 2, 2);
         painter.drawRect(QRectF(7, 3, 8, 5));
         painter.drawRect(QRectF(8, 13, 9, 6));
@@ -339,9 +364,10 @@ QIcon fileActionIcon(const QString& kind) {
 }
 
 QFrame* makeStatCard(const QString& title, const QString& description,
-                     QLabel*& value, int iconIndex, QWidget* parent) {
+                     QLabel*& value, int iconIndex, QWidget* parent,
+                     const QString& objectName = "statCard") {
     auto* frame = new QFrame(parent);
-    frame->setObjectName("statCard");
+    frame->setObjectName(objectName);
     frame->setMinimumHeight(126);
     auto* layout = new QVBoxLayout(frame);
     layout->setContentsMargins(16, 12, 16, 12);
@@ -374,6 +400,8 @@ QFrame* makeStatCard(const QString& title, const QString& description,
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowTitle("Smart Clinic | Patient & Appointment Management");
+    setWindowIcon(clinicLogoIcon());
+    QApplication::setWindowIcon(clinicLogoIcon());
     resize(1320, 850);
     const QDir appDir(QApplication::applicationDirPath());
     dataPath = appDir.filePath("clinic_data.json");
@@ -447,6 +475,43 @@ bool MainWindow::saveData(const QString& path, bool notify) {
     return true;
 }
 
+void MainWindow::createNewClinic() {
+    QMessageBox confirmation(QMessageBox::Question, "Create a new clinic file",
+        "Choose a new filename for an empty clinic. Your current clinic file and data will be preserved.",
+        QMessageBox::Ok | QMessageBox::Cancel, this);
+    confirmation.setDefaultButton(QMessageBox::Cancel);
+    confirmation.setStyleSheet(
+        "QMessageBox{background:#202124;}"
+        "QMessageBox QLabel{color:#ffffff;}"
+        "QMessageBox QPushButton{color:#ffffff;background:#3157a4;"
+        "border:0;border-radius:5px;padding:7px 18px;}"
+        "QMessageBox QPushButton:hover{background:#27488b;}");
+    if (confirmation.exec() != QMessageBox::Ok) return;
+
+    const QString path = QFileDialog::getSaveFileName(
+        this, "Create new clinic file", QDir::home().filePath("clinic_new.json"),
+        "JSON files (*.json)");
+    if (path.isEmpty()) return;
+    if (QFile::exists(path)) {
+        showClinicMessage(this, QMessageBox::Warning, "File already exists",
+                          "Choose a new filename so the existing file is not overwritten.");
+        return;
+    }
+
+    scapms::model::ClinicDatabase emptyDatabase;
+    scapms::model::WaitingQueue emptyQueue;
+    QString error;
+    if (!scapms::utils::FileHandler::save(path, emptyDatabase, emptyQueue, error)) {
+        showClinicMessage(this, QMessageBox::Warning, "New clinic could not be created", error);
+        return;
+    }
+
+    dataPath = path;
+    clinic.reset();
+    refreshAll();
+    statusBar()->showMessage("New empty clinic created. Changes will be saved to " + path, 7000);
+}
+
 void MainWindow::persistAfterChange(const QString& successMessage) {
     if (saveData(dataPath, false)) {
         statusBar()->showMessage(successMessage, 5000);
@@ -460,11 +525,13 @@ void MainWindow::persistAfterChange(const QString& successMessage) {
 void MainWindow::buildUi() {
     auto* fileMenu = menuBar()->addMenu("&File");
     fileMenu->setObjectName("fileMenu");
+    QAction* newClinic = fileMenu->addAction(fileActionIcon("new"), "&New clinic...");
     QAction* load = fileMenu->addAction(fileActionIcon("load"), "&Load JSON...");
     QAction* save = fileMenu->addAction(fileActionIcon("save"), "&Save\tCtrl+S");
     QAction* exportData = fileMenu->addAction(fileActionIcon("export"), "Save &As JSON...");
     fileMenu->addSeparator();
     QAction* exit = fileMenu->addAction(fileActionIcon("exit"), "E&xit\tCtrl+Q");
+    connect(newClinic, &QAction::triggered, this, &MainWindow::createNewClinic);
     connect(save, &QAction::triggered, this, [this]() { saveData(dataPath, true); });
     connect(load, &QAction::triggered, this, [this]() {
         const QString path = QFileDialog::getOpenFileName(this, "Load clinic records", QDir::homePath(), "JSON files (*.json)");
@@ -502,9 +569,9 @@ void MainWindow::buildUi() {
     brandLayout->setSpacing(9);
     auto* logo = new QLabel(brandRow);
     logo->setFixedSize(38, 38);
-    const QPixmap logoImage(":/assets/clinic-logo.png");
-    if (!logoImage.isNull())
-        logo->setPixmap(logoImage.scaled(38, 38, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    logo->setAlignment(Qt::AlignCenter);
+    logo->setAccessibleName("Smart Clinic logo");
+    logo->setPixmap(clinicLogoPixmap(QSize(38, 38)));
     auto* brandText = new QVBoxLayout();
     brandText->setContentsMargins(0, 0, 0, 0);
     brandText->setSpacing(1);
@@ -605,6 +672,7 @@ void MainWindow::buildUi() {
         "QPushButton#dashboardViewAll{background:transparent;color:#3157a4;border:0;padding:5px 8px;font-weight:600;}"
         "QPushButton#dashboardViewAll:hover{background:#edf3ff;}"
         "#statCard{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #f8faff,stop:1 #edf4ff);border:1px solid #dce8ff;border-top:3px solid #5c7bec;border-radius:11px;}"
+        "#reportStatCard{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #f8faff,stop:1 #edf4ff);border:1px solid #dce8ff;border-radius:11px;}"
         "#statIconShell{background:#e3edff;border:1px solid #d2e1ff;border-radius:14px;}"
         "#statValue{color:#244bb5;font-size:25px;}"
         "#statDescription{color:#7b8ba6;font-size:10px;}"
@@ -1372,13 +1440,13 @@ QWidget* MainWindow::makeReportsPage() {
     auto* metrics = new QHBoxLayout();
     metrics->setSpacing(13);
     metrics->addWidget(makeStatCard("Registered patients", "All clinic records",
-                                    reportPatientTotal, 1, content));
+                                    reportPatientTotal, 1, content, "reportStatCard"));
     metrics->addWidget(makeStatCard("Appointments today", "All appointment statuses",
-                                    reportAppointmentTotal, 2, content));
+                                    reportAppointmentTotal, 2, content, "reportStatCard"));
     metrics->addWidget(makeStatCard("Completed today", "Visits completed today",
-                                    reportCompletedTotal, 2, content));
+                                    reportCompletedTotal, 2, content, "reportStatCard"));
     metrics->addWidget(makeStatCard("Patients waiting", "Current queue size",
-                                    reportWaitingTotal, 3, content));
+                                    reportWaitingTotal, 3, content, "reportStatCard"));
     layout->addLayout(metrics);
 
     auto makeReportCard = [content](const QString& titleText, const QString& hintText,
