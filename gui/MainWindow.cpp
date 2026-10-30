@@ -612,7 +612,9 @@ void MainWindow::buildUi() {
         "#patientOverlay{background:rgba(25,35,60,105);}"
         "#patientDrawerTitle{font-size:18px;font-weight:700;color:#253247;}"
         "#appointmentCount{color:#778397;font-size:12px;}"
+        "#queueCount{color:#778397;font-size:12px;}"
         "#appointmentSearchControls{background:#ffffff;border:1px solid #e4e9f0;border-radius:11px;}"
+        "#queueSearchControls{background:#ffffff;border:1px solid #e4e9f0;border-radius:11px;}"
         "#appointmentDrawer{background:#ffffff;border-left:1px solid #e2e8f0;}"
         "#appointmentOverlay{background:rgba(25,35,60,105);}"
         "#appointmentDrawerTitle{font-size:18px;font-weight:700;color:#253247;}"
@@ -639,6 +641,9 @@ void MainWindow::buildUi() {
         "QTableWidget#appointmentRecordsTable{background:#ffffff;alternate-background-color:#f8faff;border:0;gridline-color:transparent;selection-background-color:#f0f5ff;outline:0;}"
         "QTableWidget#appointmentRecordsTable::item{border:0;padding:10px 9px;color:#344054;}"
         "QTableWidget#appointmentRecordsTable QHeaderView::section{background:#ffffff;color:#667085;border:0;border-bottom:1px solid #e6ebf2;padding:11px 9px;font-weight:600;}"
+        "QTableWidget#waitingQueueTable{background:#ffffff;alternate-background-color:#f8faff;border:0;gridline-color:transparent;selection-background-color:#f0f5ff;outline:0;}"
+        "QTableWidget#waitingQueueTable::item{border:0;padding:10px 9px;color:#344054;}"
+        "QTableWidget#waitingQueueTable QHeaderView::section{background:#ffffff;color:#667085;border:0;border-bottom:1px solid #e6ebf2;padding:11px 9px;font-weight:600;}"
         "#mutedText{color:#778397;} QLineEdit,QComboBox,QSpinBox,QDateTimeEdit{color:#253247;padding:8px 10px;border:1px solid #d8dee8;border-radius:7px;background:#ffffff;}"
         "QComboBox::drop-down{ subcontrol-origin:padding;subcontrol-position:top right;width:30px;border:0;background:transparent;}"
         "QComboBox::down-arrow{image:none;width:0;height:0;}"
@@ -1210,14 +1215,106 @@ QWidget* MainWindow::makeAppointmentsPage() {
 }
 
 QWidget* MainWindow::makeQueuePage() {
-    auto* page=new QWidget(this);auto* layout=new QVBoxLayout(page);
-    auto* heading=new QLabel("Consultation waiting queue",page);QFont f=heading->font();f.setPointSize(20);f.setBold(true);heading->setFont(f);layout->addWidget(heading);
-    auto* box=new QGroupBox("Queue actions",page);auto* row=new QHBoxLayout(box);
-    queuePatientId=new QLineEdit(box);queuePatientId->setPlaceholderText("Patient ID");auto* join=new QPushButton("Add to queue",box);auto* next=new QPushButton("Call next patient",box);
-    row->addWidget(new QLabel("Patient ID",box));row->addWidget(queuePatientId);row->addWidget(join);row->addWidget(next);layout->addWidget(box);
-    queueTable=makeTable({"Position","Patient ID","Name","Category","Priority"},page);layout->addWidget(queueTable,1);
-    auto* note=new QLabel("Patients are called in the order they joined. Emergency category is visibly flagged; queue order remains first-in, first-out.",page);note->setWordWrap(true);layout->addWidget(note);
-    connect(join,&QPushButton::clicked,this,&MainWindow::onJoinQueue);connect(next,&QPushButton::clicked,this,&MainWindow::onCallNext);
+    auto* page = new QWidget(this);
+    auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(24, 22, 24, 22);
+    layout->setSpacing(15);
+
+    auto* headingRow = new QHBoxLayout();
+    auto* heading = new QLabel("Waiting Queue", page);
+    QFont headingFont = heading->font();
+    headingFont.setPointSize(21);
+    headingFont.setBold(true);
+    heading->setFont(headingFont);
+    queueCountLabel = new QLabel("0 patients waiting", page);
+    queueCountLabel->setObjectName("queueCount");
+    auto* callNext = new QPushButton("Call next patient", page);
+    callNext->setObjectName("addPatientButton");
+    headingRow->addWidget(heading);
+    headingRow->addSpacing(8);
+    headingRow->addWidget(queueCountLabel);
+    headingRow->addStretch();
+    headingRow->addWidget(callNext);
+    layout->addLayout(headingRow);
+
+    auto* addCard = new QFrame(page);
+    addCard->setObjectName("queueSearchControls");
+    auto* addLayout = new QHBoxLayout(addCard);
+    addLayout->setContentsMargins(14, 12, 14, 12);
+    addLayout->setSpacing(10);
+    queuePatientId = new QLineEdit(addCard);
+    queuePatientId->setPlaceholderText("Type a registered patient ID");
+    queuePatientId->setClearButtonEnabled(true);
+    queuePatientSuggestionModel = new QStringListModel(this);
+    queuePatientCompleter = new QCompleter(queuePatientSuggestionModel, queuePatientId);
+    queuePatientCompleter->setCaseSensitivity(Qt::CaseInsensitive);
+    queuePatientCompleter->setFilterMode(Qt::MatchStartsWith);
+    queuePatientCompleter->setCompletionMode(QCompleter::PopupCompletion);
+    queuePatientId->setCompleter(queuePatientCompleter);
+    queuePatientPreview = new QLabel("Type a patient ID to see matching registered patients.", addCard);
+    queuePatientPreview->setObjectName("appointmentPatientPreview");
+    queuePatientPreview->setWordWrap(true);
+    auto* picker = new QWidget(addCard);
+    auto* pickerLayout = new QVBoxLayout(picker);
+    pickerLayout->setContentsMargins(0, 0, 0, 0);
+    pickerLayout->setSpacing(5);
+    pickerLayout->addWidget(queuePatientId);
+    pickerLayout->addWidget(queuePatientPreview);
+    auto* addToQueue = new QPushButton("Add to queue", addCard);
+    addToQueue->setObjectName("drawerPrimaryButton");
+    addLayout->addWidget(new QLabel("Patient", addCard));
+    addLayout->addWidget(picker, 1);
+    addLayout->addWidget(addToQueue);
+    layout->addWidget(addCard);
+
+    auto* searchControls = new QFrame(page);
+    searchControls->setObjectName("queueSearchControls");
+    auto* searchLayout = new QHBoxLayout(searchControls);
+    searchLayout->setContentsMargins(14, 8, 14, 8);
+    queueSearchText = new QLineEdit(searchControls);
+    queueSearchText->setPlaceholderText("Search the queue by patient ID or name");
+    auto* clearSearch = new QPushButton("Clear", searchControls);
+    clearSearch->setObjectName("drawerCancelButton");
+    searchLayout->addWidget(queueSearchText, 1);
+    searchLayout->addWidget(clearSearch);
+    layout->addWidget(searchControls);
+
+    queueTable = makeTable({"Position", "Patient ID", "Patient", "Category", "Priority", ""}, page);
+    queueTable->setObjectName("waitingQueueTable");
+    queueTable->setShowGrid(false);
+    queueTable->verticalHeader()->setDefaultSectionSize(52);
+    queueTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    queueTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    queueTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    queueTable->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
+    queueTable->horizontalHeader()->setSectionResizeMode(5, QHeaderView::Fixed);
+    queueTable->setColumnWidth(5, 48);
+    auto* tableCard = new QFrame(page);
+    tableCard->setObjectName("appointmentsCard");
+    auto* tableCardLayout = new QVBoxLayout(tableCard);
+    tableCardLayout->setContentsMargins(12, 3, 12, 8);
+    tableCardLayout->setSpacing(0);
+    tableCardLayout->addWidget(queueTable);
+    layout->addWidget(tableCard, 1);
+    auto* note = new QLabel("Patients are called in the order they joined. Emergency status is highlighted, while queue order remains first-in, first-out.", page);
+    note->setObjectName("mutedText");
+    note->setWordWrap(true);
+    layout->addWidget(note);
+
+    connect(addToQueue, &QPushButton::clicked, this, &MainWindow::onJoinQueue);
+    connect(callNext, &QPushButton::clicked, this, &MainWindow::onCallNext);
+    connect(queueSearchText, &QLineEdit::textChanged, this, [this]() { refreshQueue(); });
+    connect(queuePatientId, &QLineEdit::textChanged, this, [this]() { updateQueuePatientPreview(); });
+    connect(queuePatientCompleter, qOverload<const QString&>(&QCompleter::activated), this,
+            [this](const QString& id) {
+                queuePatientId->setText(id.trimmed());
+                updateQueuePatientPreview();
+            });
+    connect(clearSearch, &QPushButton::clicked, this, [this]() {
+        queueSearchText->clear();
+        refreshQueue();
+    });
+    refreshQueuePatientSuggestions();
     return page;
 }
 
@@ -1293,7 +1390,7 @@ void MainWindow::populatePatientTable(QTableWidget* table,const std::vector<cons
     }
 }
 
-void MainWindow::refreshPatients(){std::vector<const scapms::model::PatientRecord*> patients;for(const auto& p:clinic.database().getPatients())patients.push_back(p.get());populatePatientTable(patientTable,patients);if(patientsCountLabel)patientsCountLabel->setText(QString("%1 patient record%2").arg(patients.size()).arg(patients.size()==1?"":"s"));refreshAppointmentPatientSuggestions();}
+void MainWindow::refreshPatients(){std::vector<const scapms::model::PatientRecord*> patients;for(const auto& p:clinic.database().getPatients())patients.push_back(p.get());populatePatientTable(patientTable,patients);if(patientsCountLabel)patientsCountLabel->setText(QString("%1 patient record%2").arg(patients.size()).arg(patients.size()==1?"":"s"));refreshAppointmentPatientSuggestions();refreshQueuePatientSuggestions();}
 
 void MainWindow::refreshAppointmentPatientSuggestions() {
     if (!appointmentPatientSuggestionModel) return;
@@ -1343,6 +1440,56 @@ void MainWindow::updateAppointmentPatientPreview() {
         appointmentPatientPreview->style()->unpolish(appointmentPatientPreview);
         appointmentPatientPreview->style()->polish(appointmentPatientPreview);
         appointmentPatientPreview->update();
+    }
+}
+
+void MainWindow::refreshQueuePatientSuggestions() {
+    if (!queuePatientSuggestionModel) return;
+    QStringList suggestions;
+    for (const auto& patient : clinic.database().getPatients()) {
+        if (patient) suggestions.push_back(q(patient->getPatientId()));
+    }
+    queuePatientSuggestionModel->setStringList(suggestions);
+    updateQueuePatientPreview();
+}
+
+void MainWindow::updateQueuePatientPreview() {
+    if (!queuePatientPreview || !queuePatientId) return;
+    const QString typedId = queuePatientId->text().trimmed();
+    bool valid = true;
+    if (typedId.isEmpty()) {
+        queuePatientPreview->setText("Type a patient ID to see matching registered patients.");
+    } else {
+        const scapms::model::PatientRecord* exactMatch = nullptr;
+        bool prefixMatch = false;
+        for (const auto& patient : clinic.database().getPatients()) {
+            const QString id = q(patient->getPatientId());
+            if (id.compare(typedId, Qt::CaseInsensitive) == 0) {
+                exactMatch = patient.get();
+                break;
+            }
+            if (id.startsWith(typedId, Qt::CaseInsensitive)) prefixMatch = true;
+        }
+        if (exactMatch) {
+            const QString canonicalId = q(exactMatch->getPatientId());
+            if (typedId != canonicalId) queuePatientId->setText(canonicalId);
+            queuePatientPreview->setText(
+                QString("%1  •  %2  •  Age %3  •  %4")
+                    .arg(q(exactMatch->getName()), q(exactMatch->category()))
+                    .arg(exactMatch->getAge())
+                    .arg(q(exactMatch->getContact())));
+        } else if (prefixMatch) {
+            queuePatientPreview->setText("Matching patients are available. Use ↓ to choose an ID.");
+        } else {
+            valid = false;
+            queuePatientPreview->setText("No registered patient matches this ID.");
+        }
+    }
+    if (queuePatientPreview->property("valid").toBool() != valid) {
+        queuePatientPreview->setProperty("valid", valid);
+        queuePatientPreview->style()->unpolish(queuePatientPreview);
+        queuePatientPreview->style()->polish(queuePatientPreview);
+        queuePatientPreview->update();
     }
 }
 
@@ -1451,7 +1598,82 @@ void MainWindow::refreshAppointments(){
     }
 }
 
-void MainWindow::refreshQueue(){queueTable->setRowCount(0);std::size_t position=1;for(const auto&id:clinic.waitingQueue().toVector()){const auto* p=clinic.database().findPatient(id);if(!p)continue;const int r=queueTable->rowCount();queueTable->insertRow(r);queueTable->setItem(r,0,new QTableWidgetItem(QString::number(position++)));auto* idCell=new QTableWidgetItem(q(id));idCell->setData(Qt::UserRole,q(id));queueTable->setItem(r,1,idCell);queueTable->setItem(r,2,new QTableWidgetItem(q(p->getName())));queueTable->setItem(r,3,new QTableWidgetItem(q(p->category())));auto* priority=new QTableWidgetItem(p->category()=="Emergency"?"High":"Normal");if(p->category()=="Emergency")priority->setForeground(QBrush(QColor("#b42318")));queueTable->setItem(r,4,priority);}}
+void MainWindow::refreshQueue() {
+    if (!queueTable) return;
+    queueTable->clearSpans();
+    queueTable->setRowCount(0);
+    const auto queuedIds = clinic.waitingQueue().toVector();
+    if (queueCountLabel)
+        queueCountLabel->setText(QString("%1 patient%2 waiting")
+                                     .arg(queuedIds.size())
+                                     .arg(queuedIds.size() == 1 ? "" : "s"));
+    const QString query = queueSearchText ? queueSearchText->text().trimmed() : QString();
+    std::size_t position = 0;
+    int visibleCount = 0;
+    for (const auto& id : queuedIds) {
+        ++position;
+        const auto* patient = clinic.database().findPatient(id);
+        if (!patient) continue;
+        const QString patientIdValue = q(id);
+        const QString patientName = q(patient->getName());
+        if (!query.isEmpty() && !patientIdValue.contains(query, Qt::CaseInsensitive) &&
+            !patientName.contains(query, Qt::CaseInsensitive))
+            continue;
+
+        const int row = queueTable->rowCount();
+        queueTable->insertRow(row);
+        queueTable->setItem(row, 0, new QTableWidgetItem(QString::number(position)));
+        auto* idCell = new QTableWidgetItem(patientIdValue);
+        idCell->setData(Qt::UserRole, patientIdValue);
+        queueTable->setItem(row, 1, idCell);
+        queueTable->setItem(row, 2, new QTableWidgetItem(patientName));
+
+        const QString categoryName = q(patient->category());
+        const QColor categoryColor = categoryName == "Emergency" ? QColor("#c43228")
+                                   : categoryName == "Follow-up" ? QColor("#7651c7")
+                                                                 : QColor("#3265db");
+        const QString categoryIcon = categoryName == "Emergency" ? "emergency"
+                                   : categoryName == "Follow-up" ? "follow-up" : "general";
+        auto* category = new QTableWidgetItem(categoryName);
+        category->setIcon(tableMarkerIcon(categoryIcon, categoryColor));
+        category->setForeground(QBrush(categoryColor));
+        queueTable->setItem(row, 3, category);
+
+        const bool emergency = categoryName == "Emergency";
+        const QColor priorityColor = emergency ? QColor("#b42318") : QColor("#667085");
+        auto* priority = new QTableWidgetItem(emergency ? "High" : "Normal");
+        if (emergency) priority->setIcon(tableMarkerIcon("emergency", priorityColor));
+        priority->setForeground(QBrush(priorityColor));
+        queueTable->setItem(row, 4, priority);
+
+        auto* actions = new QPushButton("⋮", queueTable);
+        actions->setObjectName("patientActionButton");
+        actions->setToolTip("Queue actions");
+        queueTable->setCellWidget(row, 5, actions);
+        connect(actions, &QPushButton::clicked, this, [this, actions, patientIdValue]() {
+            QMenu menu(this);
+            menu.setStyleSheet("QMenu{background:#ffffff;color:#344054;border:1px solid #e4e9f0;padding:5px;}"
+                               "QMenu::item{background:transparent;color:#344054;padding:8px 24px 8px 8px;border-radius:5px;}"
+                               "QMenu::item:selected{background:#edf3ff;color:#3157a4;}");
+            QAction* remove = menu.addAction(tableMarkerIcon("delete", QColor("#b42318")),
+                                              "Remove from queue");
+            if (menu.exec(actions->mapToGlobal(QPoint(0, actions->height()))) == remove)
+                onRemoveFromQueue(patientIdValue);
+        });
+        ++visibleCount;
+    }
+
+    if (visibleCount == 0) {
+        queueTable->insertRow(0);
+        auto* empty = new QTableWidgetItem(query.isEmpty()
+                                               ? "No patients are waiting in the queue."
+                                               : "No queued patients match this search.");
+        empty->setTextAlignment(Qt::AlignCenter);
+        empty->setForeground(QBrush(QColor("#778397")));
+        queueTable->setItem(0, 0, empty);
+        queueTable->setSpan(0, 0, 1, queueTable->columnCount());
+    }
+}
 
 void MainWindow::refreshDashboard(){
     patientCountCard->setText(QString::number(clinic.database().patientCount()));
@@ -1634,8 +1856,9 @@ void MainWindow::onDeletePatient(){try{if(patientId->text().trimmed().isEmpty())
 void MainWindow::onScheduleAppointment(){try{const std::string id=clinic.appointments().schedule(clinic.database(),s(appointmentPatientId->text().trimmed()),s(appointmentDateTime->dateTime().toString("yyyy-MM-dd HH:mm")),s(appointmentReason->text().trimmed()));appointmentReason->clear();refreshAll();closeAppointmentDrawer();persistAfterChange("Appointment " + q(id) + " scheduled and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onCancelAppointment(){try{const int r=appointmentTable->currentRow();if(r<0||!appointmentTable->item(r,0))throw scapms::utils::ClinicException("Select an appointment first.");const QString id=appointmentTable->item(r,0)->data(Qt::UserRole).toString();if(id.isEmpty())throw scapms::utils::ClinicException("Select an appointment first.");clinic.appointments().cancel(clinic.database(),s(id));refreshAll();persistAfterChange("Appointment cancelled and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onCompleteAppointment(){try{const int r=appointmentTable->currentRow();if(r<0||!appointmentTable->item(r,0))throw scapms::utils::ClinicException("Select an appointment first.");const QString id=appointmentTable->item(r,0)->data(Qt::UserRole).toString();if(id.isEmpty())throw scapms::utils::ClinicException("Select an appointment first.");clinic.appointments().complete(clinic.database(),s(id));refreshAll();persistAfterChange("Appointment marked completed and saved.");}catch(const std::exception&e){showError(e);}}
-void MainWindow::onJoinQueue(){try{clinic.appointments().joinQueue(clinic.database(),clinic.waitingQueue(),s(queuePatientId->text().trimmed()));queuePatientId->clear();refreshAll();persistAfterChange("Patient added to the queue and saved.");}catch(const std::exception&e){showError(e);}}
+void MainWindow::onJoinQueue(){try{const QString patientIdValue=queuePatientId->text().trimmed();clinic.appointments().joinQueue(clinic.database(),clinic.waitingQueue(),s(patientIdValue));queuePatientId->clear();refreshAll();persistAfterChange("Patient added to the queue and saved.");}catch(const std::exception&e){showError(e);}}
 void MainWindow::onCallNext(){const std::string id=clinic.appointments().callNext(clinic.waitingQueue());if(id.empty()){showClinicMessage(this,QMessageBox::Information,"Waiting queue","The waiting queue is empty.");return;}const auto*p=clinic.database().findPatient(id);refreshAll();persistAfterChange("Called the next patient and saved the queue.");showClinicMessage(this,QMessageBox::Information,"Call next patient",p?"Please call " + q(p->getName()) + " ("+q(id)+").":"Please call patient "+q(id)+".");}
+void MainWindow::onRemoveFromQueue(const QString& patientIdValue){try{clinic.appointments().removeFromQueue(clinic.database(),clinic.waitingQueue(),s(patientIdValue));refreshAll();persistAfterChange("Patient removed from the waiting queue and saved. Use Undo to restore the queue.");}catch(const std::exception&e){showError(e);}}
 
 void MainWindow::onSearch(){const QString query=queryText->text().trimmed();if(query.isEmpty()){showClinicMessage(this,QMessageBox::Information,"Search","Enter an ID, name, or category.");return;}std::vector<const scapms::model::PatientRecord*> result;const auto method=queryMethod->currentText();if(method=="Linear by ID")result=clinic.search().linearId(clinic.database(),query.toUtf8().toStdString());else if(method=="Binary by ID")result=clinic.search().binaryId(clinic.database(),query.toUtf8().toStdString());else if(method=="Recursive by name")result=clinic.search().recursiveNameSearch(clinic.database(),query.toUtf8().toStdString());else result=clinic.search().categorySearch(clinic.database(),query.toUtf8().toStdString());populatePatientTable(patientTable,result);statusBar()->showMessage(QString("Found %1 patient record(s). Search does not count as opening a record.").arg(result.size()),6000);}
 

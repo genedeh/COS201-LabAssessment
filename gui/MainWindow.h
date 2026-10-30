@@ -74,6 +74,11 @@ private:
     QCompleter* appointmentPatientCompleter = nullptr;
     QStringListModel* appointmentPatientSuggestionModel = nullptr;
     QLineEdit* queuePatientId = nullptr;
+    QLabel* queuePatientPreview = nullptr;
+    QLabel* queueCountLabel = nullptr;
+    QLineEdit* queueSearchText = nullptr;
+    QCompleter* queuePatientCompleter = nullptr;
+    QStringListModel* queuePatientSuggestionModel = nullptr;
 
     QLineEdit* queryText = nullptr;
     QComboBox* queryMethod = nullptr;
@@ -120,6 +125,8 @@ private:
     void closeAppointmentDrawer();
     void refreshAppointmentPatientSuggestions();
     void updateAppointmentPatientPreview();
+    void refreshQueuePatientSuggestions();
+    void updateQueuePatientPreview();
     void populatePatientTable(QTableWidget* table,
                               const std::vector<const scapms::model::PatientRecord*>& patients);
     void onCategoryChanged(const QString& category);
@@ -132,6 +139,7 @@ private:
     void onCompleteAppointment();
     void onJoinQueue();
     void onCallNext();
+    void onRemoveFromQueue(const QString& patientId);
     void onSearch();
     void onSort();
     void onUndo();

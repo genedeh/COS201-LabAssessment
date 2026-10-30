@@ -89,6 +89,17 @@ public:
                                           patientId, nullptr, std::nullopt, queueBefore));
         return patientId;
     }
+
+    void removeFromQueue(model::ClinicDatabase& database, model::WaitingQueue& queue,
+                         const std::string& patientId) {
+        if (!database.findPatient(patientId))
+            throw utils::ClinicException("Patient not found.");
+        const auto queueBefore = queue.toVector();
+        if (!queue.remove(patientId))
+            throw utils::ClinicException("That patient is not in the waiting queue.");
+        history.record(model::AdminAction(model::AdminAction::Kind::QueueRemoved,
+                                          patientId, nullptr, std::nullopt, queueBefore));
+    }
 };
 
 } // namespace scapms::controller

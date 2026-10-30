@@ -48,6 +48,7 @@ public:
             break;
         case model::AdminAction::Kind::QueueJoined:
         case model::AdminAction::Kind::QueueCalledNext:
+        case model::AdminAction::Kind::QueueRemoved:
             waiting.restore(action->waitingQueueBefore);
             break;
         }
