@@ -41,7 +41,6 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTimer>
-#include <QToolBar>
 #include <QVBoxLayout>
 #include <QStringList>
 
@@ -289,6 +288,49 @@ QIcon tableMarkerIcon(const QString& kind, const QColor& color) {
     return QIcon(pixmap);
 }
 
+QIcon fileActionIcon(const QString& kind) {
+    QPixmap pixmap(48, 48);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.scale(2.0, 2.0);
+    painter.setPen(QPen(QColor("#f8fafc"), 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+
+    if (kind == "save") {
+        painter.drawRoundedRect(QRectF(4, 3, 16, 18), 2, 2);
+        painter.drawRect(QRectF(7, 3, 8, 5));
+        painter.drawRect(QRectF(8, 13, 9, 6));
+        painter.drawLine(QPointF(10, 4), QPointF(10, 7));
+    } else if (kind == "load") {
+        QPainterPath folder;
+        folder.moveTo(3, 7); folder.lineTo(9, 7); folder.lineTo(11, 10);
+        folder.lineTo(21, 10); folder.lineTo(19, 19); folder.lineTo(4, 19);
+        folder.closeSubpath();
+        painter.drawPath(folder);
+        painter.drawLine(QPointF(12, 3), QPointF(12, 11));
+        painter.drawLine(QPointF(9, 8), QPointF(12, 11));
+        painter.drawLine(QPointF(15, 8), QPointF(12, 11));
+    } else if (kind == "export") {
+        QPainterPath document;
+        document.moveTo(6, 3); document.lineTo(15, 3); document.lineTo(19, 7);
+        document.lineTo(19, 13); document.moveTo(15, 3); document.lineTo(15, 7);
+        document.lineTo(19, 7); document.moveTo(6, 3); document.lineTo(6, 21);
+        document.lineTo(13, 21);
+        painter.drawPath(document);
+        painter.drawLine(QPointF(11, 16), QPointF(21, 16));
+        painter.drawLine(QPointF(18, 13), QPointF(21, 16));
+        painter.drawLine(QPointF(18, 19), QPointF(21, 16));
+    } else if (kind == "exit") {
+        painter.drawRoundedRect(QRectF(3, 3, 11, 18), 1, 1);
+        painter.drawEllipse(QRectF(10, 11, 1.5, 1.5));
+        painter.drawLine(QPointF(10, 12), QPointF(21, 12));
+        painter.drawLine(QPointF(17, 8), QPointF(21, 12));
+        painter.drawLine(QPointF(17, 16), QPointF(21, 12));
+    }
+    return QIcon(pixmap);
+}
+
 QFrame* makeStatCard(const QString& title, const QString& description,
                      QLabel*& value, int iconIndex, QWidget* parent) {
     auto* frame = new QFrame(parent);
@@ -410,11 +452,12 @@ void MainWindow::persistAfterChange(const QString& successMessage) {
 
 void MainWindow::buildUi() {
     auto* fileMenu = menuBar()->addMenu("&File");
-    QAction* save = fileMenu->addAction("&Save (Ctrl+S)");
-    QAction* load = fileMenu->addAction("&Load JSON...");
-    QAction* exportData = fileMenu->addAction("Save &As JSON...");
+    fileMenu->setObjectName("fileMenu");
+    QAction* load = fileMenu->addAction(fileActionIcon("load"), "&Load JSON...");
+    QAction* save = fileMenu->addAction(fileActionIcon("save"), "&Save\tCtrl+S");
+    QAction* exportData = fileMenu->addAction(fileActionIcon("export"), "Save &As JSON...");
     fileMenu->addSeparator();
-    QAction* exit = fileMenu->addAction("E&xit (Ctrl+Q)");
+    QAction* exit = fileMenu->addAction(fileActionIcon("exit"), "E&xit\tCtrl+Q");
     connect(save, &QAction::triggered, this, [this]() { saveData(dataPath, true); });
     connect(load, &QAction::triggered, this, [this]() {
         const QString path = QFileDialog::getOpenFileName(this, "Load clinic records", QDir::homePath(), "JSON files (*.json)");
@@ -425,14 +468,6 @@ void MainWindow::buildUi() {
         if (!path.isEmpty()) saveData(path, true);
     });
     connect(exit, &QAction::triggered, this, &QWidget::close);
-
-    // Put file actions in the visible window as well as the File menu so
-    // users can find JSON load/save without knowing the menu location.
-    auto* fileToolbar = addToolBar("File");
-    fileToolbar->setMovable(false);
-    fileToolbar->addAction(load);
-    fileToolbar->addAction(save);
-    fileToolbar->addAction(exportData);
 
     // Use explicit application-wide bindings because QKeySequence::Quit is
     // platform dependent and may not map to Ctrl+Q on Windows.
@@ -536,6 +571,13 @@ void MainWindow::buildUi() {
 
     setStyleSheet(
         "QMainWindow{background:#f5f7fb;color:#253247;} QWidget{color:#253247;}"
+        "QMenuBar{background:#202124;color:#ffffff;padding:3px 6px;}"
+        "QMenuBar::item{background:transparent;color:#ffffff;padding:7px 11px;border-radius:5px;}"
+        "QMenuBar::item:selected,QMenuBar::item:pressed{background:#34363a;color:#ffffff;}"
+        "QMenu{background:#202124;color:#ffffff;border:1px solid #3d4045;padding:5px;}"
+        "QMenu::item{background:transparent;color:#ffffff;padding:8px 30px 8px 10px;}"
+        "QMenu::item:selected{background:#3157a4;color:#ffffff;}"
+        "QMenu::separator{height:1px;background:#45484d;margin:5px 8px;}"
         "#sidebar{background:#ffffff;border-right:1px solid #e4e9f0;}"
         "#brandTitle{font-size:15px;font-weight:700;color:#253247;}"
         "#brandSubtitle{font-size:10px;color:#8a96a8;}"
