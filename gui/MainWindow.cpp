@@ -1270,7 +1270,7 @@ void MainWindow::populatePatientTable(QTableWidget* table,const std::vector<cons
         connect(actions, &QPushButton::clicked, this, [this, actions, patientIdValue]() {
             QMenu menu(this);
             menu.setStyleSheet("QMenu{background:#ffffff;border:1px solid #e4e9f0;padding:5px;}"
-                               "QMenu::item{padding:8px 24px 8px 8px;border-radius:5px;}"
+                               "QMenu::item{color:#344054;padding:8px 24px 8px 8px;border-radius:5px;}"
                                "QMenu::item:selected{background:#edf3ff;color:#3157a4;}");
             QAction* editAction = menu.addAction(tableMarkerIcon("edit", QColor("#3157a4")), "Edit patient");
             QAction* deleteAction = menu.addAction(tableMarkerIcon("delete", QColor("#b42318")), "Delete patient");
@@ -1409,29 +1409,28 @@ void MainWindow::refreshAppointments(){
         status->setForeground(QBrush(statusColor));
         appointmentTable->setItem(row, 5, status);
 
-        auto* actions = new QPushButton("⋮", appointmentTable);
-        actions->setObjectName("patientActionButton");
-        actions->setToolTip("Appointment actions");
-        appointmentTable->setCellWidget(row, 6, actions);
         const bool isPending = appointment.getStatus() == scapms::model::AppointmentStatus::Pending;
-        connect(actions, &QPushButton::clicked, this, [this, actions, row, appointmentId, isPending]() {
-            QMenu menu(this);
-            menu.setStyleSheet("QMenu{background:#ffffff;border:1px solid #e4e9f0;padding:5px;}"
-                               "QMenu::item{padding:8px 24px 8px 8px;border-radius:5px;}"
-                               "QMenu::item:selected{background:#edf3ff;color:#3157a4;}"
-                               "QMenu::item:disabled{color:#98a2b3;}");
-            QAction* completeAction = menu.addAction(tableMarkerIcon("completed", QColor("#067647")),
-                                                      "Mark as complete");
-            QAction* cancelAction = menu.addAction(tableMarkerIcon("cancelled", QColor("#b42318")),
-                                                    "Cancel appointment");
-            completeAction->setEnabled(isPending);
-            cancelAction->setEnabled(isPending);
-            QAction* chosen = menu.exec(actions->mapToGlobal(QPoint(0, actions->height())));
-            appointmentTable->selectRow(row);
-            if (chosen == completeAction) onCompleteAppointment();
-            else if (chosen == cancelAction) onCancelAppointment();
-            Q_UNUSED(appointmentId);
-        });
+        if (isPending) {
+            auto* actions = new QPushButton("⋮", appointmentTable);
+            actions->setObjectName("patientActionButton");
+            actions->setToolTip("Appointment actions");
+            appointmentTable->setCellWidget(row, 6, actions);
+            connect(actions, &QPushButton::clicked, this, [this, actions, row, appointmentId]() {
+                QMenu menu(this);
+                menu.setStyleSheet("QMenu{background:#ffffff;color:#344054;border:1px solid #e4e9f0;padding:5px;}"
+                                   "QMenu::item{background:transparent;color:#344054;padding:8px 24px 8px 8px;border-radius:5px;}"
+                                   "QMenu::item:selected{background:#edf3ff;color:#3157a4;}");
+                QAction* completeAction = menu.addAction(tableMarkerIcon("completed", QColor("#067647")),
+                                                          "Mark as complete");
+                QAction* cancelAction = menu.addAction(tableMarkerIcon("cancelled", QColor("#b42318")),
+                                                        "Cancel appointment");
+                QAction* chosen = menu.exec(actions->mapToGlobal(QPoint(0, actions->height())));
+                appointmentTable->selectRow(row);
+                if (chosen == completeAction) onCompleteAppointment();
+                else if (chosen == cancelAction) onCancelAppointment();
+                Q_UNUSED(appointmentId);
+            });
+        }
         ++visibleCount;
     }
 
