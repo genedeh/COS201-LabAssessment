@@ -28,6 +28,7 @@
 #include <QMessageBox>
 #include <QKeySequence>
 #include <QIcon>
+#include <QLayout>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPaintEvent>
@@ -1114,34 +1115,46 @@ QWidget* MainWindow::makeAppointmentsPage() {
     calendar->setStyleSheet(
         "QCalendarWidget{background:#202124;color:#ffffff;border:1px solid #3d4045;}"
         "QCalendarWidget QWidget#qt_calendar_navigationbar{background:#3157a4;border:0;}"
-        "QCalendarWidget QToolButton{color:#ffffff;background:transparent;border:0;border-radius:5px;padding:5px;font-weight:600;}"
+        "QCalendarWidget QToolButton{color:#ffffff;background:transparent;border:0;border-radius:5px;padding:0 5px;font-weight:600;min-height:30px;max-height:30px;}"
         "QCalendarWidget QToolButton:hover{background:#456bb6;}"
-        "QCalendarWidget QToolButton#qt_calendar_monthbutton{min-width:112px;text-align:center;}"
+        "QCalendarWidget QToolButton#qt_calendar_monthbutton{min-width:112px;text-align:center;padding:0 18px 0 8px;}"
+        "QCalendarWidget QToolButton#qt_calendar_monthbutton::menu-indicator{subcontrol-origin:padding;subcontrol-position:right center;}"
         "QCalendarWidget QToolButton#qt_calendar_yearbutton{min-width:58px;text-align:center;}"
-        "QCalendarWidget QSpinBox#qt_calendar_yearedit{color:#ffffff;background:#253247;border:1px solid #526078;border-radius:4px;padding:3px;}"
+        "QCalendarWidget QSpinBox#qt_calendar_yearedit{color:#ffffff;background:#253247;border:1px solid #526078;border-radius:4px;padding:2px;height:26px;}"
         "QCalendarWidget QAbstractItemView{background:#202124;color:#ffffff;selection-background-color:#3157a4;selection-color:#ffffff;gridline-color:#3d4045;outline:0;}"
         "QCalendarWidget QAbstractItemView:disabled{color:#7b8491;}"
         "QCalendarWidget QHeaderView::section{background:#253247;color:#ffffff;border:0;padding:6px;font-weight:600;}"
         "QCalendarWidget QMenu{background:#202124;color:#ffffff;border:1px solid #3d4045;}"
         "QCalendarWidget QMenu::item{color:#ffffff;padding:6px 18px;}"
         "QCalendarWidget QMenu::item:selected{background:#3157a4;color:#ffffff;}");
+    if (auto* navigationBar = calendar->findChild<QWidget*>("qt_calendar_navigationbar")) {
+        if (auto* navigationLayout = qobject_cast<QHBoxLayout*>(navigationBar->layout())) {
+            navigationLayout->setContentsMargins(8, 0, 8, 0);
+            navigationLayout->setSpacing(4);
+            navigationLayout->setAlignment(Qt::AlignVCenter);
+        }
+    }
     if (auto* monthButton = calendar->findChild<QToolButton*>("qt_calendar_monthbutton")) {
         monthButton->setMinimumWidth(112);
+        monthButton->setFixedHeight(30);
         monthButton->setStyleSheet("text-align:center;");
     }
     if (auto* yearButton = calendar->findChild<QToolButton*>("qt_calendar_yearbutton")) {
         yearButton->setMinimumWidth(58);
+        yearButton->setFixedHeight(30);
         yearButton->setStyleSheet("text-align:center;");
     }
     if (auto* previousMonth = calendar->findChild<QToolButton*>("qt_calendar_prevmonth")) {
         previousMonth->setText("‹");
         previousMonth->setIcon(QIcon());
         previousMonth->setFixedWidth(32);
+        previousMonth->setFixedHeight(30);
     }
     if (auto* nextMonth = calendar->findChild<QToolButton*>("qt_calendar_nextmonth")) {
         nextMonth->setText("›");
         nextMonth->setIcon(QIcon());
         nextMonth->setFixedWidth(32);
+        nextMonth->setFixedHeight(30);
     }
     appointmentReason = new QLineEdit(appointmentDrawer);
     appointmentReason->setPlaceholderText("Routine check-up, follow-up...");
