@@ -45,6 +45,11 @@ private:
     QLabel* dashboardWelcomeSummary = nullptr;
     QLabel* patientsCountLabel = nullptr;
     QLabel* appointmentsCountLabel = nullptr;
+    QLabel* reportPatientTotal = nullptr;
+    QLabel* reportAppointmentTotal = nullptr;
+    QLabel* reportCompletedTotal = nullptr;
+    QLabel* reportWaitingTotal = nullptr;
+    QLabel* reportDateLabel = nullptr;
 
     QTableWidget* dashboardTable = nullptr;
     QTableWidget* patientTable = nullptr;

@@ -34,10 +34,12 @@
 #include <QPaintEvent>
 #include <QPixmap>
 #include <QPropertyAnimation>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStackedLayout>
 #include <QStackedWidget>
+#include <QScrollArea>
 #include <QStringListModel>
 #include <QShortcut>
 #include <QStatusBar>
@@ -618,6 +620,15 @@ void MainWindow::buildUi() {
         "#appointmentDrawer{background:#ffffff;border-left:1px solid #e2e8f0;}"
         "#appointmentOverlay{background:rgba(25,35,60,105);}"
         "#appointmentDrawerTitle{font-size:18px;font-weight:700;color:#253247;}"
+        "#reportDateBadge{color:#3157a4;background:#edf3ff;border:1px solid #dce8ff;border-radius:7px;padding:7px 10px;font-weight:600;}"
+        "#reportCard{background:#ffffff;border:1px solid #e5eaf2;border-radius:12px;}"
+        "#reportCardTitle{font-size:14px;font-weight:700;color:#253247;}"
+        "#reportCardHint{font-size:10px;color:#8490a1;}"
+        "QTableWidget#reportDataTable{background:#ffffff;alternate-background-color:#f8faff;border:0;gridline-color:transparent;selection-background-color:#f0f5ff;outline:0;}"
+        "QTableWidget#reportDataTable::item{border:0;padding:8px 9px;color:#344054;}"
+        "QTableWidget#reportDataTable QHeaderView::section{background:#ffffff;color:#667085;border:0;border-bottom:1px solid #e6ebf2;padding:9px;font-weight:600;}"
+        "QProgressBar#accessProgress{background:#edf1f8;border:0;border-radius:6px;color:#344054;text-align:center;min-height:19px;max-height:19px;font-size:10px;}"
+        "QProgressBar#accessProgress::chunk{background:#6279e8;border-radius:6px;}"
         "#appointmentPatientPreview{color:#475467;background:#f6f8fc;border:1px solid #e6ebf2;border-radius:7px;padding:8px 10px;font-size:11px;}"
         "#appointmentPatientPreview[valid=\"false\"]{color:#b42318;background:#fff5f4;border-color:#fecdca;}"
         "QPushButton#closePatientDrawerButton{background:#f7f9fc;color:#53627a;border:1px solid #e2e8f0;border-radius:8px;padding:0;font-size:22px;font-weight:400;}"
@@ -1319,17 +1330,94 @@ QWidget* MainWindow::makeQueuePage() {
 }
 
 QWidget* MainWindow::makeReportsPage() {
-    auto* page=new QWidget(this);auto* layout=new QVBoxLayout(page);
-    auto* heading=new QLabel("Clinic reports",page);QFont f=heading->font();f.setPointSize(20);f.setBold(true);heading->setFont(f);layout->addWidget(heading);
-    auto* grid=new QGridLayout();
-    auto addReport=[&](const QString& title,const QStringList& headers,QTableWidget*& table,int r,int c){auto* box=new QGroupBox(title,page);auto* b=new QVBoxLayout(box);table=makeTable(headers,box);table->setMinimumHeight(150);b->addWidget(table);grid->addWidget(box,r,c);};
-    addReport("Most frequently attended patients",{"Patient ID","Name","Completed visits"},frequentTable,0,0);
-    addReport("Patients with pending appointments",{"Patient ID","Name","Pending"},pendingTable,0,1);
-    addReport("Patient category distribution",{"Category","Patients"},categoryTable,1,0);
-    addReport("Today's appointment summary",{"Date","Total","Completed","Pending","Cancelled"},dailyTable,1,1);
-    addReport("Frequently opened records",{"Patient ID","Access count"},accessTable,2,0);
-    layout->addLayout(grid,1);
-    auto* refresh=new QPushButton("Refresh reports",page);layout->addWidget(refresh,0,Qt::AlignRight);connect(refresh,&QPushButton::clicked,this,&MainWindow::refreshReports);
+    auto* page = new QWidget(this);
+    auto* pageLayout = new QVBoxLayout(page);
+    pageLayout->setContentsMargins(0, 0, 0, 0);
+    auto* scroll = new QScrollArea(page);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    auto* content = new QWidget(scroll);
+    auto* layout = new QVBoxLayout(content);
+    layout->setContentsMargins(24, 22, 24, 22);
+    layout->setSpacing(15);
+
+    auto* headingRow = new QHBoxLayout();
+    auto* titleBlock = new QVBoxLayout();
+    titleBlock->setSpacing(3);
+    auto* heading = new QLabel("Reports", content);
+    QFont headingFont = heading->font();
+    headingFont.setPointSize(21);
+    headingFont.setBold(true);
+    heading->setFont(headingFont);
+    auto* subtitle = new QLabel("Clinic activity and patient care overview", content);
+    subtitle->setObjectName("mutedText");
+    titleBlock->addWidget(heading);
+    titleBlock->addWidget(subtitle);
+    reportDateLabel = new QLabel(content);
+    reportDateLabel->setObjectName("reportDateBadge");
+    auto* refresh = new QPushButton("Refresh reports", content);
+    headingRow->addLayout(titleBlock);
+    headingRow->addStretch();
+    headingRow->addWidget(reportDateLabel);
+    headingRow->addWidget(refresh);
+    layout->addLayout(headingRow);
+
+    auto* metrics = new QHBoxLayout();
+    metrics->setSpacing(13);
+    metrics->addWidget(makeStatCard("Registered patients", "All clinic records",
+                                    reportPatientTotal, 1, content));
+    metrics->addWidget(makeStatCard("Appointments today", "All appointment statuses",
+                                    reportAppointmentTotal, 2, content));
+    metrics->addWidget(makeStatCard("Completed today", "Visits completed today",
+                                    reportCompletedTotal, 2, content));
+    metrics->addWidget(makeStatCard("Patients waiting", "Current queue size",
+                                    reportWaitingTotal, 3, content));
+    layout->addLayout(metrics);
+
+    auto makeReportCard = [content](const QString& titleText, const QString& hintText,
+                                    const QStringList& headers, QTableWidget*& table) {
+        auto* card = new QFrame(content);
+        card->setObjectName("reportCard");
+        auto* cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(13, 12, 13, 12);
+        cardLayout->setSpacing(5);
+        auto* title = new QLabel(titleText, card);
+        title->setObjectName("reportCardTitle");
+        auto* hint = new QLabel(hintText, card);
+        hint->setObjectName("reportCardHint");
+        table = new QTableWidget(0, headers.size(), card);
+        table->setHorizontalHeaderLabels(headers);
+        configureTable(table);
+        table->setObjectName("reportDataTable");
+        table->setShowGrid(false);
+        table->verticalHeader()->setDefaultSectionSize(42);
+        table->setMinimumHeight(150);
+        cardLayout->addWidget(title);
+        cardLayout->addWidget(hint);
+        cardLayout->addWidget(table);
+        return card;
+    };
+
+    auto* grid = new QGridLayout();
+    grid->setHorizontalSpacing(14);
+    grid->setVerticalSpacing(14);
+    grid->addWidget(makeReportCard("Patient categories", "Registered patients by care category",
+                                   {"Category", "Patients"}, categoryTable), 0, 0);
+    grid->addWidget(makeReportCard("Appointment status today", "Today's appointments by status",
+                                   {"Status", "Appointments"}, dailyTable), 0, 1);
+    grid->addWidget(makeReportCard("Frequently attended patients", "Patients with the most completed visits",
+                                   {"Patient ID", "Patient", "Visits"}, frequentTable), 1, 0);
+    grid->addWidget(makeReportCard("Patients with pending appointments", "Upcoming visits that still need attention",
+                                   {"Patient ID", "Patient", "Pending"}, pendingTable), 1, 1);
+    grid->addWidget(makeReportCard("Frequently opened records", "This session · bars scale to the most-opened record",
+                                   {"Patient ID", "Patient", "Accesses"}, accessTable), 2, 0, 1, 2);
+    grid->setColumnStretch(0, 1);
+    grid->setColumnStretch(1, 1);
+    layout->addLayout(grid);
+    layout->addStretch();
+    scroll->setWidget(content);
+    pageLayout->addWidget(scroll);
+    connect(refresh, &QPushButton::clicked, this, &MainWindow::refreshReports);
     return page;
 }
 
@@ -1751,11 +1839,112 @@ void MainWindow::refreshDashboard(){
 }
 
 void MainWindow::refreshReports(){
-    const auto frequent=clinic.reports().mostFrequentlyAttended(clinic.database());frequentTable->setRowCount(0);for(const auto&e:frequent){int r=frequentTable->rowCount();frequentTable->insertRow(r);frequentTable->setItem(r,0,new QTableWidgetItem(q(e.patientId)));frequentTable->setItem(r,1,new QTableWidgetItem(q(e.name)));frequentTable->setItem(r,2,new QTableWidgetItem(QString::number(e.visits)));}
-    const auto pending=clinic.reports().patientsWithPendingAppointments(clinic.database());pendingTable->setRowCount(0);for(const auto&e:pending){int r=pendingTable->rowCount();pendingTable->insertRow(r);pendingTable->setItem(r,0,new QTableWidgetItem(q(e.patientId)));pendingTable->setItem(r,1,new QTableWidgetItem(q(e.name)));pendingTable->setItem(r,2,new QTableWidgetItem(QString::number(e.appointments)));}
-    const auto categories=clinic.reports().categoryDistribution(clinic.database());categoryTable->setRowCount(0);for(const auto&e:categories){int r=categoryTable->rowCount();categoryTable->insertRow(r);categoryTable->setItem(r,0,new QTableWidgetItem(q(e.category)));categoryTable->setItem(r,1,new QTableWidgetItem(QString::number(e.count)));}
-    const auto daily=clinic.reports().dailySummary(clinic.database(),s(QDate::currentDate().toString("yyyy-MM-dd")));dailyTable->setRowCount(0);dailyTable->insertRow(0);dailyTable->setItem(0,0,new QTableWidgetItem(q(daily.date)));dailyTable->setItem(0,1,new QTableWidgetItem(QString::number(daily.total)));dailyTable->setItem(0,2,new QTableWidgetItem(QString::number(daily.completed)));dailyTable->setItem(0,3,new QTableWidgetItem(QString::number(daily.pending)));dailyTable->setItem(0,4,new QTableWidgetItem(QString::number(daily.cancelled)));
-    const auto accesses=clinic.reports().frequentAccesses(clinic.accessCache());accessTable->setRowCount(0);for(const auto&e:accesses){int r=accessTable->rowCount();accessTable->insertRow(r);accessTable->setItem(r,0,new QTableWidgetItem(q(e.patientId)));accessTable->setItem(r,1,new QTableWidgetItem(QString::number(e.accesses)));}
+    if (!frequentTable) return;
+    const QDate today = QDate::currentDate();
+    const auto daily = clinic.reports().dailySummary(
+        clinic.database(), s(today.toString("yyyy-MM-dd")));
+    if (reportDateLabel)
+        reportDateLabel->setText("Today  ·  " + today.toString("d MMM yyyy"));
+    if (reportPatientTotal) reportPatientTotal->setText(QString::number(clinic.database().patientCount()));
+    if (reportAppointmentTotal) reportAppointmentTotal->setText(QString::number(daily.total));
+    if (reportCompletedTotal) reportCompletedTotal->setText(QString::number(daily.completed));
+    if (reportWaitingTotal) reportWaitingTotal->setText(QString::number(clinic.waitingQueue().size()));
+
+    auto showEmpty = [](QTableWidget* table, const QString& message) {
+        table->setRowCount(0);
+        table->clearSpans();
+        table->insertRow(0);
+        auto* item = new QTableWidgetItem(message);
+        item->setTextAlignment(Qt::AlignCenter);
+        item->setForeground(QBrush(QColor("#8490a1")));
+        table->setItem(0, 0, item);
+        table->setSpan(0, 0, 1, table->columnCount());
+    };
+
+    const auto categories = clinic.reports().categoryDistribution(clinic.database());
+    categoryTable->setRowCount(0);
+    categoryTable->clearSpans();
+    for (const auto& entry : categories) {
+        const int row = categoryTable->rowCount();
+        categoryTable->insertRow(row);
+        const QString name = q(entry.category);
+        const QColor color = name == "Emergency" ? QColor("#c43228")
+                           : name == "Follow-up" ? QColor("#7651c7")
+                                                 : QColor("#3265db");
+        const QString icon = name == "Emergency" ? "emergency"
+                           : name == "Follow-up" ? "follow-up" : "general";
+        auto* category = new QTableWidgetItem(name);
+        category->setIcon(tableMarkerIcon(icon, color));
+        category->setForeground(QBrush(color));
+        categoryTable->setItem(row, 0, category);
+        categoryTable->setItem(row, 1, new QTableWidgetItem(QString::number(entry.count)));
+    }
+    if (categories.empty()) showEmpty(categoryTable, "No patient records yet.");
+
+    dailyTable->setRowCount(0);
+    dailyTable->clearSpans();
+    auto addStatusRow = [this](const QString& label, std::size_t count,
+                               const QString& icon, const QColor& color) {
+        const int row = dailyTable->rowCount();
+        dailyTable->insertRow(row);
+        auto* status = new QTableWidgetItem(label);
+        status->setIcon(tableMarkerIcon(icon, color));
+        status->setForeground(QBrush(color));
+        dailyTable->setItem(row, 0, status);
+        dailyTable->setItem(row, 1, new QTableWidgetItem(QString::number(count)));
+    };
+    addStatusRow("Pending", daily.pending, "pending", QColor("#b54708"));
+    addStatusRow("Completed", daily.completed, "completed", QColor("#067647"));
+    addStatusRow("Cancelled", daily.cancelled, "cancelled", QColor("#b42318"));
+
+    const auto frequent = clinic.reports().mostFrequentlyAttended(clinic.database());
+    frequentTable->setRowCount(0);
+    frequentTable->clearSpans();
+    for (const auto& entry : frequent) {
+        const int row = frequentTable->rowCount();
+        frequentTable->insertRow(row);
+        frequentTable->setItem(row, 0, new QTableWidgetItem(q(entry.patientId)));
+        frequentTable->setItem(row, 1, new QTableWidgetItem(q(entry.name)));
+        frequentTable->setItem(row, 2, new QTableWidgetItem(QString::number(entry.visits)));
+    }
+    if (frequent.empty()) showEmpty(frequentTable, "No completed visits recorded yet.");
+
+    const auto pending = clinic.reports().patientsWithPendingAppointments(clinic.database());
+    pendingTable->setRowCount(0);
+    pendingTable->clearSpans();
+    for (const auto& entry : pending) {
+        const int row = pendingTable->rowCount();
+        pendingTable->insertRow(row);
+        pendingTable->setItem(row, 0, new QTableWidgetItem(q(entry.patientId)));
+        pendingTable->setItem(row, 1, new QTableWidgetItem(q(entry.name)));
+        pendingTable->setItem(row, 2, new QTableWidgetItem(QString::number(entry.appointments)));
+    }
+    if (pending.empty()) showEmpty(pendingTable, "No pending appointments.");
+
+    const auto accesses = clinic.reports().frequentAccesses(clinic.accessCache());
+    accessTable->setRowCount(0);
+    accessTable->clearSpans();
+    std::size_t highestAccessCount = 1;
+    for (const auto& entry : accesses)
+        highestAccessCount = std::max(highestAccessCount, entry.accesses);
+    for (const auto& entry : accesses) {
+        const int row = accessTable->rowCount();
+        accessTable->insertRow(row);
+        accessTable->setItem(row, 0, new QTableWidgetItem(q(entry.patientId)));
+        const auto* patient = clinic.database().findPatient(entry.patientId);
+        accessTable->setItem(row, 1, new QTableWidgetItem(
+            patient ? q(patient->getName()) : QString("Unknown patient")));
+        auto* progress = new QProgressBar(accessTable);
+        progress->setObjectName("accessProgress");
+        progress->setRange(0, 100);
+        progress->setValue(static_cast<int>(entry.accesses * 100 / highestAccessCount));
+        progress->setFormat(QString("%1 access%2")
+                                .arg(entry.accesses)
+                                .arg(entry.accesses == 1 ? "" : "es"));
+        progress->setTextVisible(true);
+        accessTable->setCellWidget(row, 2, progress);
+    }
+    if (accesses.empty()) showEmpty(accessTable, "Open a patient record to start tracking access counts.");
 }
 
 void MainWindow::refreshAll(){if(!patientTable)return;refreshPatients();refreshAppointments();refreshQueue();refreshDashboard();refreshReports();}
