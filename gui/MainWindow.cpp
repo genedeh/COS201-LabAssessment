@@ -1192,7 +1192,7 @@ QWidget* MainWindow::makeAppointmentsPage() {
             [this]() { updateAppointmentPatientPreview(); });
     connect(appointmentPatientCompleter,
             qOverload<const QString&>(&QCompleter::activated), this, [this](const QString& completion) {
-                const QString id = completion.section(" — ", 0, 0).trimmed();
+                const QString id = completion.trimmed();
                 appointmentPatientId->setText(id);
                 updateAppointmentPatientPreview();
             });
@@ -1300,7 +1300,7 @@ void MainWindow::refreshAppointmentPatientSuggestions() {
     QStringList suggestions;
     for (const auto& patient : clinic.database().getPatients()) {
         if (patient)
-            suggestions.push_back(q(patient->getPatientId()) + " — " + q(patient->getName()));
+            suggestions.push_back(q(patient->getPatientId()));
     }
     appointmentPatientSuggestionModel->setStringList(suggestions);
     updateAppointmentPatientPreview();
